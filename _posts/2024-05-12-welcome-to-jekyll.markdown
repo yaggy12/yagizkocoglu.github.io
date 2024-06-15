@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Welcome to Jekyll!"
+title:  "Yağız Koçoğlu"
 date:   2024-05-12 00:31:31 +0300
 categories: jekyll update
 ---
