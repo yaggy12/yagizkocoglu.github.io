@@ -41,8 +41,6 @@ footer:
 social:
   - title: twitter
     url: http://x.com/yagiz05015707
-  - title: facebook
-    url:
   - title: stack-overflow
     url: http://stackoverflow.com/questions/tagged/jekyll
   - title: bitbucket
