@@ -7,5 +7,5 @@ alt: image-alt
 project-date: April 2014
 client: Start Bootstrap
 category: Web Development
-description: Ekip olarak Amerika merkezli Conrad Challange'a katıldık. Yapay Zeka Destekli Duygu Analizi Yapabilen Chatbot projemiz ile COVİD-19 salgını sürecinde insanların psikolojik desteğe erişimini hızlandırmak ve kolaylaştırmak istedik ve yarı finale yükseldik. Conrad Yenilikçisi olarak adlandırıldı ve 5 ABD kolejinden değişen miktarlarda burs aldı.
+description: Ekip olarak Amerika merkezli Conrad Challange'a katıldık. Yapay Zeka Destekli Duygu Analizi Yapabilen Chatbot projemiz ile COVİD-19 salgını sürecinde insanların psikolojik desteğe erişimini hızlandırmak ve kolaylaştırmak istedik. Yaptığımız bu proje ile yarı finale yükseldik. Conrad Yenilikçisi olarak adlandırıldık ve 5 ABD kolejinden değişen miktarlarda burslar elde ettik.
 ---
