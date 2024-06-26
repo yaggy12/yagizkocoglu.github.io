@@ -7,5 +7,5 @@ alt: image-alt
 project-date: June 2024
 client: Start Bootstrap
 category: Web Development
-description: Use this area of the page to describe your project. Lorem ipsum dolor sit amet, consectetur adipisicing elit. Mollitia neque assumenda ipsam nihil, molestias magnam, recusandae quos quis inventore quisquam velit asperiores, vitae? Reprehenderit soluta, eos quod consequuntur itaque. Nam.B
+description: Aselsan'ın UGES (Ulaşım, Güvenlik, Enerji ve Otomasyon) biriminde Görüntü Yönetim Alt Sistemleri Ar-Ge Laboratuvarı'nda staj yaptım. IP kameralar, plaka ve yüz takip sistemi kameraları, kızılötesi kameralar ve NVR cihazlarının araştırma geliştirme süreçlerini yakından gözlemleme fırsatı buldum. Stajım sırasında üretilen kameraların fonksiyonlarını test etmek için Python tabanlı bir arayüz tasarladım. Ayrıca zamanlayıcı ve akım kontrol devresi tasarladım.
 ---
