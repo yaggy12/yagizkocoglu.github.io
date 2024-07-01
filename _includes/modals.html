@@ -15,7 +15,7 @@
             <h2>{{ post.title }}</h2>
             <hr class="light">
             {% for image in post.images %}
-            <img src="img/portfolio/{{ image.img }}" class="img-responsive img-centered" alt="{{ image.alt }}">
+            <img src="img/portfolio/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
             {% endfor %}
             {% if post.description %}
             <p>{{ post.description }}</p>
