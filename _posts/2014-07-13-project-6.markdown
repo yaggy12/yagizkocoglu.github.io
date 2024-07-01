@@ -1,14 +1,13 @@
 ---
-layout: "default"
-modal-id: "6"
+title: "Project Title"
+modal-id: "project1"
 images:
-  - img: "Rocket.png"
+  - img: "image1.jpg"
     alt: "Image 1 description"
-  - img: "aselsan.png"
+  - img: "image2.jpg"
     alt: "Image 2 description"
 description: "This is a description of the project."
 client: "Client Name"
 project-date: "January 2024"
 category: "Category"
 ---
-
