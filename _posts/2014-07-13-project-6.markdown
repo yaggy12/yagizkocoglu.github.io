@@ -1,16 +1,16 @@
 ---
 layout: post
-modal-id: 6
+modal-id: 1
 title: Post title
-date: 2014-07-25
+date: 2017-01-06T00:00:00.000Z
 location: Project location
 category: Post category
-description: Bir yıl sonra Limitless Makers yaz kampına mentor olarak davet edildim. Projelerinde çalışan öğrencilere eğitim ve mentorluk verdim.
+description: Post description
 images-array:
- - image: Roket.png
+ - image: image-1.jpg
    alt: This is some alt text
- - image: aselsan.png
+ - image: image-2.jpg
    alt: This is some alt text
- - image: Roket.png
+ - image: image-3.jpg
    alt: This is some alt text
 ---
