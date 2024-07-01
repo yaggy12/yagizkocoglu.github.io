@@ -1,5 +1,5 @@
 ---
-title: "Project Title"
+layout: "Project Title"
 modal-id: "6"
 images:
   - img: "Rocket.png"
