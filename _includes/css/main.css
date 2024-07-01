@@ -471,6 +471,20 @@ footer .footer-below {
     -ms-transform: rotate(90deg);
     transform: rotate(90deg);
 }
+#news {
+  padding: 60px 0;
+}
+
+#news .section-heading {
+  font-size: 30px;
+  margin-top: 0;
+  margin-bottom: 15px;
+}
+
+#news .img-fluid {
+  margin-bottom: 15px;
+}
+
 
 .navbar-nav>.active>a {
     background-color: #{{ site.color.secondary-dark }} !important;
