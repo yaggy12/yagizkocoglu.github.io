@@ -1,16 +1,11 @@
 ---
 layout: default
 modal-id: 6
-title: Post title
-date: 2017-01-06T00:00:00.000Z
-location: Project location
-category: Post category
-description: Post description
-images-array:
- - image: Roket.png
-   alt: This is some alt text
- - image: aselsan.png
-   alt: This is some alt text
- - image: CONRAD.png
-   alt: This is some alt text
+date: 2014-07-15
+img: Lm2022.png
+alt: image-alt
+project-date: April 2014
+client: Start Bootstrap
+category: Web Development
+description: Bir yıl sonra Limitless Makers yaz kampına mentor olarak davet edildim. Projelerinde çalışan öğrencilere eğitim ve mentorluk verdim.
 ---
