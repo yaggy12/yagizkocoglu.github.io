@@ -15,7 +15,9 @@
           <div class="modal-body">
             <h2>{{ post.title }}</h2>
             <hr class="light">
-            <img src="img/portfolio/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
+            {% for image in post.images %}
+            <img src="img/portfolio/{{ image.img }}" class="img-responsive img-centered" alt="{{ image.alt }}">
+            {% endfor %}
             {% if post.description %}
             <p>{{ post.description }}</p>
             {% endif %}
@@ -27,7 +29,7 @@
               {% endif %}
               {% if post.project-date %}
               <li>Date:
-                <strong>{{ post.project-date }}</strong>
+                <strong>{{ post['project-date'] }}</strong>
               </li>
               {% endif %}
               {% if post.category %}
@@ -36,9 +38,8 @@
               </li>
               {% endif %}
             </ul>
-            <button type="button" class="btn btn-default" data-dismiss="modal"><i class="fa fa-times"></i>
-              Close</button>
-              Kapat</button>
+            <button type="button" class="btn btn-default" data-dismiss="modal"><i class="fa fa-times"></i> Close</button>
+            <!-- Remove the extra "Kapat" button text -->
           </div>
         </div>
       </div>
