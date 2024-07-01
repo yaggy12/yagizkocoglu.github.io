@@ -1,13 +1,13 @@
 ---
-title: "Project Title"
-modal-id: "project1"
+title: proje 1 
+modal-id: 6
 images:
-  - img: "image1.jpg"
-    alt: "Image 1 description"
-  - img: "image2.jpg"
-    alt: "Image 2 description"
-description: "This is a description of the project."
-client: "Client Name"
-project-date: "January 2024"
-category: "Category"
+  - img: Roket.png
+    alt: roket projesi
+  - img: CONRAD.png
+    alt: CONRAD yarışması
+description: yarışmaya katıldım
+client: Ben
+project-date: january 2021
+category: proje
 ---
