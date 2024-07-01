@@ -2,11 +2,7 @@
 layout: default
 modal-id: 6
 date: 2014-07-15
-image:
-  - img: Roket.png
-    alt: roket projesi
-  - img: CONRAD.png
-    alt: CONRAD yarışması
+img: Lm2022.png
 alt: image-alt
 project-date: April 2014
 client: Start Bootstrap
