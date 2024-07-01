@@ -2,7 +2,7 @@
 layout: default
 modal-id: 6
 title: Post title
-date: 2014-07-15
+date: 2014-07-25
 location: Project location
 category: Post category
 description: Bir yıl sonra Limitless Makers yaz kampına mentor olarak davet edildim. Projelerinde çalışan öğrencilere eğitim ve mentorluk verdim.
