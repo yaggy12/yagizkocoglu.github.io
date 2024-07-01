@@ -1,5 +1,5 @@
 ---
-layout: default
+layout: post
 modal-id: 6
 title: Post title
 date: 2014-07-25
