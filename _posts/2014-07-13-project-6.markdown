@@ -1,6 +1,6 @@
 ---
 title: "Project Title"
-modal-id: 6
+modal-id: "6"
 images:
   - img: "Rocket.png"
     alt: "Image 1 description"
