@@ -15,9 +15,7 @@
           <div class="modal-body">
             <h2>{{ post.title }}</h2>
             <hr class="light">
-            {% for image in post.images %}
-            <img src="img/portfolio/{{ image.img }}" class="img-responsive img-centered" alt="{{ image.alt }}">
-            {% endfor %}
+            <img src="img/portfolio/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
             {% if post.description %}
             <p>{{ post.description }}</p>
             {% endif %}
