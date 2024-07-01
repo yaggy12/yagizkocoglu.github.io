@@ -18,6 +18,10 @@
             <img src="img/portfolio/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
             {% if post.description %}
             <p>{{ post.description }}</p>
+            {% for item in post.images-array %}
+            <div class="col-sm-4">
+                <img class="img-responsive" src="img/portfolio/{{ item.image }}" alt="{{ item.alt }}">
+            </div>
             {% endif %}
             <ul class="list-inline item-details">
               {% if post.client %}
