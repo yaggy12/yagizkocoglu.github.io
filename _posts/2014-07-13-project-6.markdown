@@ -2,7 +2,7 @@
 layout: default
 modal-id: 6
 date: 2014-07-15
-images:
+image:
   - img: Roket.png
     alt: roket projesi
   - img: CONRAD.png
