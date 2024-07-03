@@ -472,6 +472,39 @@ footer .footer-below {
     transform: rotate(90deg);
 }
 
+.news-container {
+    margin: 20px 0;
+}
+
+.news-container h1 {
+    font-size: 2em;
+    margin-bottom: 20px;
+}
+
+.news-container ul {
+    list-style: none;
+    padding: 0;
+}
+
+.news-container li {
+    margin-bottom: 10px;
+}
+
+.news-container a {
+    font-size: 1.2em;
+    color: #333;
+    text-decoration: none;
+}
+
+.news-container a:hover {
+    text-decoration: underline;
+}
+
+.news-container p {
+    font-size: 0.9em;
+    color: #666;
+}
+
 .navbar-nav>.active>a {
     background-color: #{{ site.color.secondary-dark }} !important;
 }
