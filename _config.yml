@@ -61,13 +61,3 @@ defaults:
       type: "posts"
     values:
       permalink: ""
-
-nav:
-  - text: "Home"
-    href: "/"
-  - text: "Projects"
-    href: "/#portfolio"
-  - text: "News"
-    href: "/#news"
-  - text: "Contact"
-    href: "/#contact"
