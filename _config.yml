@@ -61,7 +61,3 @@ defaults:
       type: "posts"
     values:
       permalink: ""
-collections:
-  news:
-    output: true
-
