@@ -1,12 +1,10 @@
-<!-- Portfolio Modals -->
-{% for post in site.newspost %}
-<div class="portfolio-modal modal fade" id="portfolioModal-{{ post.modal-id }}" tabindex="-1" role="dialog"
-  aria-hidden="true">
+<!-- News Modals -->
+{% for post in site.news %}
+<div class="news-modal modal fade" id="newsModal-{{ post.modal-id }}" tabindex="-1" role="dialog" aria-hidden="true">
   <div class="modal-content">
     <div class="close-modal" data-dismiss="modal">
       <div class="lr">
-        <div class="rl">
-        </div>
+        <div class="rl"></div>
       </div>
     </div>
     <div class="container">
@@ -15,29 +13,28 @@
           <div class="modal-body">
             <h2>{{ post.title }}</h2>
             <hr class="light">
-            <img src="img/portfolio/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
+            <img src="img/news/{{ post.img }}" class="img-responsive img-centered" alt="{{ post.alt }}">
             {% if post.description %}
             <p>{{ post.description }}</p>
             {% endif %}
             <ul class="list-inline item-details">
-              {% if post.client %}
-              <li>Client:
-                <strong>{{ post.client }}</strong>
+              {% if post.author %}
+              <li>Author:
+                <strong>{{ post.author }}</strong>
               </li>
               {% endif %}
-              {% if post.project-date %}
+              {% if post.date %}
               <li>Date:
-                <strong>{{ post.project-date }}</strong>
+                <strong>{{ post.date }}</strong>
               </li>
               {% endif %}
               {% if post.category %}
-              <li>Service:
+              <li>Category:
                 <strong>{{ post.category }}</strong>
               </li>
               {% endif %}
             </ul>
-            <button type="button" class="btn btn-default" data-dismiss="modal"><i class="fa fa-times"></i>
-              Kapat</button>
+            <button type="button" class="btn btn-default" data-dismiss="modal"><i class="fa fa-times"></i> Kapat</button>
           </div>
         </div>
       </div>
