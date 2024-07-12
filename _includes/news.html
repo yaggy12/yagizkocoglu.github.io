@@ -1,22 +1,22 @@
-<!-- News Grid Section -->
-<section id="news">
-  <div class="container news-flex-grid">
+<!-- Portfolio Grid Section -->
+<section id="portfolio">
+  <div class="container portfolio-flex-grid">
     <div class="row">
       <div class="col-lg-12 text-center">
-        <h2>Haberler</h2> <!-- Turkish for "News" -->
+        <h2>GelİŞMELER</h2>
         <hr class="light">
       </div>
     </div>
-    <div class="news-flex-row">
-      {% for post in site.news %}
-      <div class="news-flex-item news-item">
-        <a href="#newsModal-{{ post.modal-id }}" class="news-link" data-toggle="modal">
+    <div class="portfolio-flex-row">
+      {% for post in site.posts %}
+      <div class="portfolio-flex-item portfolio-item">
+        <a href="#portfolioModal-{{ post.modal-id }}" class="portfolio-link" data-toggle="modal">
           <div class="caption">
             <div class="caption-content">
               <i class="fa fa-search-plus fa-3x"></i>
             </div>
           </div>
-          <img src="img/news/{{ post.img }}" class="img-responsive" alt="{{ post.alt }}">
+          <img src="img/portfolio/{{ post.img }}" class="img-responsive" alt="{{ post.alt }}">
         </a>
       </div>
       {% endfor %}
