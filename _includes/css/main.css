@@ -471,6 +471,18 @@ footer .footer-below {
     -ms-transform: rotate(90deg);
     transform: rotate(90deg);
 }
+.portfolio-item {
+    position: relative;
+    display: block;
+    margin-bottom: 30px;
+}
+
+.portfolio-item img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 10px;
+}
+
 
 .navbar-nav>.active>a {
     background-color: #{{ site.color.secondary-dark }} !important;
