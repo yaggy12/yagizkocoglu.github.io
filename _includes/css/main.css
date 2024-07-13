@@ -472,17 +472,6 @@ footer .footer-below {
     transform: rotate(90deg);
 }
 
-.news-item img {
-    max-width: 80%; /* Set this to your desired percentage or pixel value */
-    height: auto;
-    border-radius: 10px;
-    transition: all 0.2s ease-in-out;
-}
-
-.news-item:hover img {
-    transform: scale(1.05);
-}
-
 .news-modal .modal-content {
     padding: 100px 0;
     text-align: center;
@@ -493,6 +482,8 @@ footer .footer-below {
 }
 
 .news-modal img {
+    max-width: 90%; /* Adjust this to make the image section wider */
+    height: auto;
     margin-bottom: 1.5rem;
 }
 
