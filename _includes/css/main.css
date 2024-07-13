@@ -471,6 +471,7 @@ footer .footer-below {
     -ms-transform: rotate(90deg);
     transform: rotate(90deg);
 }
+
 .portfolio-item {
     position: relative;
     display: block;
@@ -481,6 +482,24 @@ footer .footer-below {
     max-width: 100%;
     height: auto;
     border-radius: 10px;
+    transition: all 0.2s ease-in-out;
+}
+
+.portfolio-item:hover img {
+    transform: scale(1.05);
+}
+
+.portfolio-modal .modal-content {
+    padding: 100px 0;
+    text-align: center;
+}
+
+.portfolio-modal .modal-body {
+    padding: 2rem;
+}
+
+.portfolio-modal img {
+    margin-bottom: 1.5rem;
 }
 
 
