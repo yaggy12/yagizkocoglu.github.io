@@ -1,25 +1,26 @@
-<!-- Portfolio Grid Section -->
-<section id="portfolio">
-  <div class="container portfolio-flex-grid">
-    <div class="row">
-      <div class="col-lg-12 text-center">
-        <h2>GelİŞMELER</h2>
-        <hr class="light">
-      </div>
-    </div>
-    <div class="portfolio-flex-row">
-      {% for post in site.posts %}
-      <div class="portfolio-flex-item portfolio-item">
-        <a href="#portfolioModal-{{ post.modal-id }}" class="portfolio-link" data-toggle="modal">
-          <div class="caption">
-            <div class="caption-content">
-              <i class="fa fa-search-plus fa-3x"></i>
+<section id="news">
+    <div class="container">
+        <h2 class="text-center text-uppercase text-secondary mb-0">News</h2>
+        <hr class="star-dark mb-5">
+        <div class="row">
+            <!-- Existing content goes here -->
+
+            <!-- New Pictures Section -->
+            <div class="col-lg-4 col-sm-6 mb-4">
+                <a class="d-block mx-auto portfolio-item" href="#!">
+                    <img class="img-fluid" src="path/to/your/image1.jpg" alt="Image 1">
+                </a>
             </div>
-          </div>
-          <img src="img/portfolio/{{ post.img }}" class="img-responsive" alt="{{ post.alt }}">
-        </a>
-      </div>
-      {% endfor %}
+            <div class="col-lg-4 col-sm-6 mb-4">
+                <a class="d-block mx-auto portfolio-item" href="#!">
+                    <img class="img-fluid" src="path/to/your/image2.jpg" alt="Image 2">
+                </a>
+            </div>
+            <div class="col-lg-4 col-sm-6 mb-4">
+                <a class="d-block mx-auto portfolio-item" href="#!">
+                    <img class="img-fluid" src="path/to/your/image3.jpg" alt="Image 3">
+                </a>
+            </div>
+        </div>
     </div>
-  </div>
 </section>
