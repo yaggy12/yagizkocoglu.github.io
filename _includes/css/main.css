@@ -75,6 +75,17 @@ hr.star-primary:after {
     color: #{{ site.color.secondary }};
     background-color: #fff;
 }
+.img-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.img-container img {
+    max-width: 100%;
+    height: auto;
+}
+
 
 .img-centered {
     margin: 0 auto;
