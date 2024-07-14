@@ -5,20 +5,65 @@
         <hr class="star-dark mb-5">
         <div class="row">
             <div class="col-lg-4 col-sm-6 mb-4">
-                <a class="news-item d-block mx-auto" href="path/to/your/image1.jpg" data-lightbox="news-gallery" data-title="Image 1 Title">
-                    <img class="img-fluid" src="img/news/AA.png" alt="Image 1">
-                </a>
+                <figure>
+                    <a class="news-item d-block mx-auto" href="path/to/your/image1.jpg" data-size="1600x1067">
+                        <img class="img-fluid" src="path/to/your/image1.jpg" alt="Image 1">
+                    </a>
+                    <figcaption>Image 1 Title</figcaption>
+                </figure>
             </div>
             <div class="col-lg-4 col-sm-6 mb-4">
-                <a class="news-item d-block mx-auto" href="path/to/your/image2.jpg" data-lightbox="news-gallery" data-title="Image 2 Title">
-                    <img class="img-fluid" src="img/news/iha.png" alt="Image 2">
-                </a>
+                <figure>
+                    <a class="news-item d-block mx-auto" href="path/to/your/image2.jpg" data-size="1600x1067">
+                        <img class="img-fluid" src="path/to/your/image2.jpg" alt="Image 2">
+                    </a>
+                    <figcaption>Image 2 Title</figcaption>
+                </figure>
             </div>
             <div class="col-lg-4 col-sm-6 mb-4">
-                <a class="news-item d-block mx-auto" href="path/to/your/image3.jpg" data-lightbox="news-gallery" data-title="Image 3 Title">
-                    <img class="img-fluid" src="img/news/sdk.png" alt="Image 3">
-                </a>
+                <figure>
+                    <a class="news-item d-block mx-auto" href="path/to/your/image3.jpg" data-size="1600x1067">
+                        <img class="img-fluid" src="path/to/your/image3.jpg" alt="Image 3">
+                    </a>
+                    <figcaption>Image 3 Title</figcaption>
+                </figure>
             </div>
         </div>
     </div>
 </section>
+
+<!-- PhotoSwipe Core HTML -->
+<div class="pswp" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="pswp__bg"></div>
+    <div class="pswp__scroll-wrap">
+        <div class="pswp__container">
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+            <div class="pswp__item"></div>
+        </div>
+        <div class="pswp__ui pswp__ui--hidden">
+            <div class="pswp__top-bar">
+                <div class="pswp__counter"></div>
+                <button class="pswp__button pswp__button--close" title="Close (Esc)"></button>
+                <button class="pswp__button pswp__button--share" title="Share"></button>
+                <button class="pswp__button pswp__button--fs" title="Toggle fullscreen"></button>
+                <button class="pswp__button pswp__button--zoom" title="Zoom in/out"></button>
+                <div class="pswp__preloader">
+                    <div class="pswp__preloader__icn">
+                        <div class="pswp__preloader__cut">
+                            <div class="pswp__preloader__donut"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="pswp__share-modal pswp__share-modal--hidden pswp__single-tap">
+                <div class="pswp__share-tooltip"></div>
+            </div>
+            <button class="pswp__button pswp__button--arrow--left" title="Previous (arrow left)"></button>
+            <button class="pswp__button pswp__button--arrow--right" title="Next (arrow right)"></button>
+            <div class="pswp__caption">
+                <div class="pswp__caption__center"></div>
+            </div>
+        </div>
+    </div>
+</div>
