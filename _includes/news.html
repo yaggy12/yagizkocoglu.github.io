@@ -4,7 +4,7 @@
         <h2 class="text-center text-uppercase text-secondary mb-0">News</h2>
         <hr class="star-dark mb-5">
         <div class="row">
-            <!-- New Pictures Section -->
+            <!-- News Items -->
             <div class="col-lg-4 col-sm-6 mb-4">
                 <a class="news-item d-block mx-auto" href="#newsModal1" data-toggle="modal">
                     <img class="img-fluid" src="img/news/AA.png" alt="Image 1">
@@ -24,8 +24,8 @@
     </div>
 </section>
 
-<!-- Modals -->
-<div class="news-modal modal fade" id="newsModal1" tabindex="-1" role="dialog" aria-labelledby="newsModal1Label" aria-hidden="true">
+<!-- Modal Template -->
+<div class="news-modal modal fade" id="newsModalTemplate" tabindex="-1" role="dialog" aria-labelledby="newsModalTemplateLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl" role="document">
         <div class="modal-content">
             <button class="close" type="button" data-dismiss="modal" aria-label="Close">
@@ -35,10 +35,10 @@
                 <div class="container">
                     <div class="row justify-content-center">
                         <div class="col-lg-8">
-                            <h2 class="news-modal-title text-secondary text-uppercase mb-0" id="newsModal1Label">Image 1 Title</h2>
+                            <h2 class="news-modal-title text-secondary text-uppercase mb-0" id="newsModalTemplateLabel">Title Placeholder</h2>
                             <hr class="star-dark mb-5">
-                            <img class="img-fluid mb-5" src="img/news/AA.png" alt="Image 1">
-                            <p class="mb-5">Description for Image 1.</p>
+                            <img class="img-fluid mb-5 centered-img" src="img/news/placeholder.png" alt="Image Placeholder">
+                            <p class="mb-5">Description Placeholder.</p>
                             <button class="btn btn-primary" href="#" data-dismiss="modal">
                                 <i class="fas fa-times fa-fw"></i>
                                 Close Window
@@ -51,54 +51,24 @@
     </div>
 </div>
 
-<div class="news-modal modal fade" id="newsModal2" tabindex="-1" role="dialog" aria-labelledby="newsModal2Label" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
-        <div class="modal-content">
-            <button class="close" type="button" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-            <div class="modal-body text-center">
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-8">
-                            <h2 class="news-modal-title text-secondary text-uppercase mb-0" id="newsModal2Label">Image 2 Title</h2>
-                            <hr class="star-dark mb-5">
-                            <img class="img-fluid mb-5" src="img/news/sdk.png" alt="Image 2">
-                            <p class="mb-5">Description for Image 2.</p>
-                            <button class="btn btn-primary" href="#" data-dismiss="modal">
-                                <i class="fas fa-times fa-fw"></i>
-                                Close Window
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+<!-- Specific Modals -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const newsItems = [
+            { id: 'newsModal1', label: 'newsModal1Label', title: 'Image 1 Title', imgSrc: 'img/news/AA.png', description: 'Description for Image 1.' },
+            { id: 'newsModal2', label: 'newsModal2Label', title: 'Image 2 Title', imgSrc: 'img/news/sdk.png', description: 'Description for Image 2.' },
+            { id: 'newsModal3', label: 'newsModal3Label', title: 'Image 3 Title', imgSrc: 'img/news/iha.png', description: 'Description for Image 3.' }
+        ];
 
-<div class="news-modal modal fade" id="newsModal3" tabindex="-1" role="dialog" aria-labelledby="newsModal3Label" aria-hidden="true">
-    <div class="modal-dialog modal-xl" role="document">
-        <div class="modal-content">
-            <button class="close" type="button" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-            <div class="modal-body text-center">
-                <div class="container">
-                    <div class="row justify-content-center">
-                        <div class="col-lg-8">
-                            <h2 class="news-modal-title text-secondary text-uppercase mb-0" id="newsModal3Label">Image 3 Title</h2>
-                            <hr class="star-dark mb-5">
-                            <img class="img-fluid mb-5" src="img/news/iha.png" alt="Image 3">
-                            <p class="mb-5">Description for Image 3.</p>
-                            <button class="btn btn-primary" href="#" data-dismiss="modal">
-                                <i class="fas fa-times fa-fw"></i>
-                                Close Window
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+        newsItems.forEach(item => {
+            const modalClone = document.querySelector('#newsModalTemplate').cloneNode(true);
+            modalClone.id = item.id;
+            modalClone.querySelector('.news-modal-title').id = item.label;
+            modalClone.querySelector('.news-modal-title').innerText = item.title;
+            modalClone.querySelector('img').src = item.imgSrc;
+            modalClone.querySelector('img').alt = item.title;
+            modalClone.querySelector('p').innerText = item.description;
+            document.body.appendChild(modalClone);
+        });
+    });
+</script>
