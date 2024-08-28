@@ -4,5 +4,5 @@ modal-id: 6
 date: 2014-07-15
 img: Lm2022.png
 alt: image-alt
-description: Bir yıl sonra Limitless Makers yaz kampına mentor olarak davet edildim. Projelerinde çalışan öğrencilere eğitim ve mentorluk verdim.
+description: Akademik girişimcilik kampı Limitless Makers 2.0’ a (2022) ve Limitless Makers 4.0’ a (2024 ) mentör olarak davet edildim. Katıldığım bu zamanlarda çalışmalarımı paylaşarak proje geliştirme süreçlerinde öğrencilere yardım ettim. Aynı zamanda yapılan çalışmaların etiğini konuşarak Bilgi-Bilim-Bilim Felsefesi-Proje Yöntemleri başlıklarını birleştirerek ders verdim.
 ---
