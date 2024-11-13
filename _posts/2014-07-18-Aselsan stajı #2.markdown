@@ -2,7 +2,7 @@
 layout: default
 modal-id: 1
 date: 2014-06-15
-img: aselsan.png
+img: 
 alt: image-alt
 description: Aselsan'ın UGES (Ulaşım, Güvenlik, Enerji ve Otomasyon) biriminde Görüntü Yönetim Alt Sistemleri Ar-Ge Laboratuvarı'nda staj yaptım. IP kameralar, plaka ve yüz takip sistemi kameraları, kızılötesi kameralar ve NVR cihazlarının araştırma geliştirme süreçlerini yakından gözlemleme fırsatı buldum. Stajım sırasında üretilen kameraların fonksiyonlarını test etmek için Python tabanlı bir arayüz tasarladım. Ayrıca laboratuvarda kullanılması için zamanlayıcı ve akım kontrol devresi tasarladım.
 ---
