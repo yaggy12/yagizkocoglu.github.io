@@ -2,7 +2,7 @@
 layout: default
 modal-id: 3
 date: 2014-07-16
-img: CONRAD.png
+img: 
 alt: image-alt
 description: Ekip olarak Amerika merkezli Conrad Challange'a katıldık. Yapay Zeka Destekli Duygu Analizi Yapabilen Chatbot projemiz ile COVİD-19 salgını sürecinde insanların psikolojik desteğe erişimini hızlandırmak ve kolaylaştırmak istedik. Yaptığımız bu proje ile yarı finale yükseldik. Conrad Yenilikçisi olarak adlandırıldık ve 5 ABD kolejinden değişen miktarlarda burslar elde ettik.
 ---
