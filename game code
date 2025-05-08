@@ -1,0 +1,950 @@
+import pygame
+import sys
+import json
+import os
+import textwrap
+import random
+import math
+
+# Initialize pygame
+pygame.init()
+pygame.font.init()
+
+# Screen setup
+WIDTH, HEIGHT = 1024, 768
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Mine Escape: Card Adventure")
+
+# Colors
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GOLD = (212, 175, 55)
+RED = (200, 50, 50)
+GREEN = (50, 150, 50)
+BLUE = (50, 50, 200)
+CARD_BROWN = (139, 69, 19)
+CARD_BEIGE = (245, 245, 220)
+GRAY = (128, 128, 128)
+
+# Fonts
+font_title = pygame.font.SysFont("Georgia", 36, bold=True)
+font_subtitle = pygame.font.SysFont("Georgia", 28)
+font_body = pygame.font.SysFont("Arial", 22)
+font_button = pygame.font.SysFont("Arial", 20, bold=True)
+
+
+# Button class
+class Button:
+    def __init__(self, x, y, width, height, text, color, hover_color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.color = color
+        self.hover_color = hover_color
+        self.is_hovered = False
+
+    def draw(self, surface):
+        color = self.hover_color if self.is_hovered else self.color
+        pygame.draw.rect(surface, color, self.rect, border_radius=5)
+        pygame.draw.rect(surface, WHITE, self.rect, 2, border_radius=5)  # Border
+
+        if self.text:
+            text_surf = font_button.render(self.text, True, WHITE)
+            text_rect = text_surf.get_rect(center=self.rect.center)
+            surface.blit(text_surf, text_rect)
+
+    def is_clicked(self, pos, event):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.rect.collidepoint(pos):
+                return True
+        return False
+
+    def update(self, mouse_pos):
+        self.is_hovered = self.rect.collidepoint(mouse_pos)
+
+
+# Card class for Reigns-style swiping
+class SwipeCard:
+    def __init__(self, width, height, content):
+        self.width = width
+        self.height = height
+        self.content = content
+        self.x = (WIDTH - width) // 2
+        self.y = (HEIGHT - height) // 2
+        self.target_x = self.x
+        self.grabbed = False
+        self.grab_offset = 0
+        self.rotation = 0
+        self.decision_made = False
+        self.decision = None
+        self.surface = self.create_surface()
+        self.swipe_threshold = width * 0.3  # Distance needed to trigger a decision
+
+    def create_surface(self):
+        card = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        # Fill with semi-transparent base color
+        card.fill(CARD_BEIGE)
+        # Add a border
+        pygame.draw.rect(card, CARD_BROWN, (0, 0, self.width, self.height), 10, border_radius=20)
+
+        # Draw content
+        title = font_title.render(self.content["title"], True, BLACK)
+        title_rect = title.get_rect(center=(self.width // 2, 50))
+        card.blit(title, title_rect)
+
+        # Draw description with word wrapping
+        wrapped_text = textwrap.wrap(self.content["description"], width=50)
+        for i, line in enumerate(wrapped_text):
+            text = font_body.render(line, True, BLACK)
+            text_rect = text.get_rect(center=(self.width // 2, 120 + i * 30))
+            card.blit(text, text_rect)
+
+        # Draw choice hints at bottom if available
+        if "options" in self.content and len(self.content["options"]) >= 2:
+            left_option = font_body.render(f"← {self.content['options'][0]['text']}", True, RED)
+            right_option = font_body.render(f"{self.content['options'][1]['text']} →", True, GREEN)
+
+            card.blit(left_option, (20, self.height - 40))
+            card.blit(right_option, (self.width - right_option.get_width() - 20, self.height - 40))
+
+        return card
+
+    def handle_event(self, event, mouse_pos):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            # Check if mouse is over card
+            card_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+            if card_rect.collidepoint(mouse_pos):
+                self.grabbed = True
+                self.grab_offset = mouse_pos[0] - self.x
+
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.grabbed:
+                self.grabbed = False
+                # Check if swipe was far enough to make a decision
+                offset = self.x - ((WIDTH - self.width) // 2)
+                if offset < -self.swipe_threshold:
+                    self.decision = "left"
+                    self.decision_made = True
+                    self.target_x = -self.width  # Move off screen left
+                elif offset > self.swipe_threshold:
+                    self.decision = "right"
+                    self.decision_made = True
+                    self.target_x = WIDTH  # Move off screen right
+                else:
+                    # Return to center if not swiped far enough
+                    self.target_x = (WIDTH - self.width) // 2
+
+    def update(self, mouse_pos):
+        if self.grabbed:
+            # Move card with mouse
+            self.x = mouse_pos[0] - self.grab_offset
+
+            # Calculate rotation based on distance from center
+            center_offset = self.x - ((WIDTH - self.width) // 2)
+            self.rotation = center_offset * 0.05  # Max ~15 degrees at edges
+
+        elif self.x != self.target_x:
+            # Animate moving to target position
+            diff = self.target_x - self.x
+            self.x += diff * 0.2  # Smooth animation
+
+            # Update rotation during animation
+            center_offset = self.x - ((WIDTH - self.width) // 2)
+            self.rotation = center_offset * 0.05
+
+    def draw(self, surface):
+        # Create a copy of the card surface for rotation
+        rotated_card = pygame.transform.rotate(self.surface, self.rotation)
+
+        # Get the rect of the rotated card
+        rotated_rect = rotated_card.get_rect(center=(self.x + self.width // 2, self.y + self.height // 2))
+
+        # Draw card
+        surface.blit(rotated_card, rotated_rect.topleft)
+
+        # Draw visual cues for decision direction
+        offset = self.x - ((WIDTH - self.width) // 2)
+        if offset < -10:
+            # Show left decision hint
+            pygame.draw.rect(surface, (255, 0, 0, min(abs(offset) / 2, 100)),
+                             (50, 50, 100, HEIGHT - 100), border_radius=10)
+        elif offset > 10:
+            # Show right decision hint
+            pygame.draw.rect(surface, (0, 255, 0, min(abs(offset) / 2, 100)),
+                             (WIDTH - 150, 50, 100, HEIGHT - 100), border_radius=10)
+
+
+# Function to create a card surface
+def create_card_surface(width, height):
+    card = pygame.Surface((width, height))
+    card.fill(CARD_BEIGE)
+    pygame.draw.rect(card, CARD_BROWN, (0, 0, width, height), 10, border_radius=20)
+    return card
+
+
+def load_scenes():
+    try:
+        with open('scenes.json', 'r') as f:
+            data = json.load(f)
+            if 'scene2_BB' not in data:  # If missing, regenerate
+                print("scene2_BB missing - regenerating JSON file")
+                return create_scenes_file()
+            return data
+    except FileNotFoundError:
+        return create_scenes_file()
+
+# Enhanced GameState class
+class GameState:
+    def __init__(self):
+        self.current_scene = "start"
+        self.choices = []
+        self.boss_path = None
+        self.boss_defeated = False
+        self.decision_count = 0
+        self.card = None
+        self.next_scene = None
+        self.transition_timer = 0
+
+    def initialize_card(self, scenes):
+        if self.current_scene in scenes:
+            self.card = SwipeCard(700, 400, scenes[self.current_scene])
+
+    def add_choice(self, choice):
+        self.choices.append(choice)
+        self.decision_count += 1
+
+        # Set boss path after first decision
+        if self.decision_count == 1:
+            if choice == "A":
+                self.boss_path = "medusa"
+            elif choice == "B":
+                self.boss_path = "swamp"
+            else:
+                self.boss_path = "dragon"
+
+        # After 5 decisions, go to boss fight
+        if self.decision_count >= 5:
+            self.next_scene = f"boss_{self.boss_path}"
+
+    def update(self):
+        # Handle transitions between scenes
+        if self.next_scene:
+            self.transition_timer += 1
+            # Wait for card to move off screen before changing scene
+            if self.transition_timer > 30:  # Delay for animation
+                self.current_scene = self.next_scene
+                self.next_scene = None
+                self.transition_timer = 0
+                return True  # Scene changed
+        return False
+
+
+# Combat system
+class CombatSystem:
+    def __init__(self, boss_type):
+        self.boss_type = boss_type
+        self.player_health = 100
+        self.boss_health = 150
+        self.player_cards = self.generate_player_cards()
+        self.boss_abilities = self.get_boss_abilities()
+        self.current_turn = "player"
+        self.message = "Your turn! Select a card to play."
+        self.message_timer = 0
+        self.last_ability = None
+
+    def generate_player_cards(self):
+        # Generate cards for the player
+        base_cards = [
+            {"name": "Sword Strike", "damage": 15, "type": "attack"},
+            {"name": "Shield Block", "defense": 20, "type": "defense"},
+            {"name": "Healing Potion", "heal": 25, "type": "heal"},
+            {"name": "Fire Spell", "damage": 30, "type": "attack", "cost": 2}
+        ]
+
+        # Create a deck of four cards
+        cards = []
+        for _ in range(4):
+            cards.append(random.choice(base_cards).copy())
+        return cards
+
+    def get_boss_abilities(self):
+        abilities = {
+            "medusa": [
+                {"name": "Petrifying Gaze", "damage": 25, "effect": "stun"},
+                {"name": "Serpent Strike", "damage": 15},
+                {"name": "Stone Curse", "damage": 20, "effect": "slow"}
+            ],
+            "swamp": [
+                {"name": "Toxic Cloud", "damage": 20, "effect": "poison"},
+                {"name": "Bog Trap", "damage": 10, "effect": "root"},
+                {"name": "Monster Charge", "damage": 30}
+            ],
+            "dragon": [
+                {"name": "Fire Breath", "damage": 35},
+                {"name": "Tail Swipe", "damage": 20},
+                {"name": "Wing Buffet", "damage": 15, "effect": "knockback"}
+            ]
+        }
+        return abilities.get(self.boss_type, [])
+
+    def player_attack(self, card_index):
+        if 0 <= card_index < len(self.player_cards):
+            card = self.player_cards[card_index]
+            if card["type"] == "attack":
+                self.boss_health -= card.get("damage", 0)
+                self.message = f"You deal {card.get('damage', 0)} damage with {card['name']}!"
+            elif card["type"] == "heal":
+                heal_amount = card.get("heal", 0)
+                self.player_health = min(100, self.player_health + heal_amount)
+                self.message = f"You heal {heal_amount} health with {card['name']}!"
+            elif card["type"] == "defense":
+                # Defense reduces next boss attack
+                self.message = f"You prepare to defend with {card['name']}!"
+
+            # Remove used card and draw new one
+            self.player_cards.pop(card_index)
+            self.player_cards.append(self.generate_player_cards()[0])
+
+            self.current_turn = "boss"
+            self.message_timer = 60  # Show message for 1 second (60 frames)
+            return True
+        return False
+
+    def boss_attack(self):
+        # Boss chooses random ability
+        ability = random.choice(self.boss_abilities)
+        damage = ability.get("damage", 0)
+        self.player_health -= damage
+
+        self.message = f"Boss uses {ability['name']} for {damage} damage!"
+        # Apply any effects
+        if "effect" in ability:
+            self.message += f" ({ability['effect']} effect)"
+
+        self.current_turn = "player"
+        self.message_timer = 60  # Show message for 1 second (60 frames)
+        self.last_ability = ability
+        return ability
+
+    def update(self):
+        # Update message timer
+        if self.message_timer > 0:
+            self.message_timer -= 1
+
+        # Auto-attack for boss after delay
+        if self.current_turn == "boss" and self.message_timer == 0:
+            self.boss_attack()
+
+
+# Create scenes with more decisions
+def create_scenes_file():
+    scenes = {
+        "start": {
+            "title": "Mine Escape",
+            "description": "You wake up in a dark, crumbling mine, your hands tied with frayed rope. The air reeks of damp earth and something unnatural. A flickering torch lies nearby. You break free and grab it, hearing distant echoes of scraping stone. Time to escape—but every choice matters.",
+            "options": [
+                {"text": "Left Tunnel (Dripping)", "next": "scene1_A"},
+                {"text": "Central Tunnel (Glowing)", "next": "scene1_B"},
+                {"text": "Right Tunnel (Draft)", "next": "scene1_C"}
+            ],
+            "image": None
+        },
+        "scene1_A": {
+            "title": "The Whispering Tunnel",
+            "description": "The whispering grows louder. Your torch reveals ancient carvings of snakes on the damp walls. The sound seems to come from further down the tunnel. What do you do?",
+            "options": [
+                {"text": "Follow the whisper", "next": "scene2_AA"},
+                {"text": "Ignore it, hurry forward", "next": "scene2_AB"}
+            ],
+            "image": None
+        },
+        "scene1_B": {
+            "title": "The Glowing Passage",
+            "description": "The tunnel glows with an eerie blue light. Strange mushrooms line the walls, pulsating with bioluminescence. The air feels thick and humid.",
+            "options": [
+                {"text": "Touch the mushrooms", "next": "scene2_BA"},
+                {"text": "Avoid them carefully", "next": "scene2_BB"}
+            ],
+            "image": None
+        },
+        "scene1_C": {
+            "title": "The Drafty Shaft",
+            "description": "A cold wind blows through this tunnel, carrying the scent of smoke and sulfur. The walls are scorched in places, as if by intense heat.",
+            "options": [
+                {"text": "Follow the draft", "next": "scene2_CA"},
+                {"text": "Seek another path", "next": "scene2_CB"}
+            ],
+            "image": None
+        },
+        # Additional scenes for later decisions
+        "scene2_AA": {
+            "title": "Snake Chamber",
+            "description": "Following the whispers leads you to a chamber filled with stone snakes. The whispers grow louder, almost forming words now.",
+            "options": [
+                {"text": "Listen carefully", "next": "scene3_AAA"},
+                {"text": "Continue forward", "next": "scene3_AAB"}
+            ],
+            "image": None
+        },
+        "scene2_AB": {
+            "title": "Crumbling Passage",
+            "description": "Ignoring the whispers, you push forward. The tunnel narrows and the ceiling begins to crumble slightly.",
+            "options": [
+                {"text": "Move carefully", "next": "scene3_ABA"},
+                {"text": "Rush through", "next": "scene3_ABB"}
+            ],
+            "image": None
+        },
+        "scene2_BA": {
+            "title": "Luminous Vision",
+            "description": "As your fingers brush the mushrooms, their glow intensifies. Suddenly, visions of the mine's layout flash through your mind.",
+            "options": [
+                {"text": "Follow the vision", "next": "scene3_BAA"},
+                {"text": "Resist the vision", "next": "scene3_BAB"}
+            ],
+            "image": None
+        },
+        "scene2_BB": {
+            "title": "Spore Cloud",
+            "description": "As you carefully move past the mushrooms, you disturb a cloud of spores. The air becomes thick with glowing particles.",
+            "options": [
+                {"text": "Hold your breath", "next": "scene3_BBA"},
+                {"text": "Run forward", "next": "scene3_BBB"}
+            ],
+            "image": None
+        },
+        "scene2_CA": {
+            "title": "Heating Up",
+            "description": "Following the draft, the temperature rises dramatically. The tunnel opens up to reveal a massive chasm with flowing lava below.",
+            "options": [
+                {"text": "Cross the narrow bridge", "next": "scene3_CAA"},
+                {"text": "Seek another way", "next": "scene3_CAB"}
+            ],
+            "image": None
+        },
+        "scene2_CB": {
+            "title": "Crystal Cavern",
+            "description": "Taking another path, you discover a cavern filled with gleaming crystals that reflect your torchlight in dazzling patterns.",
+            "options": [
+                {"text": "Examine the crystals", "next": "scene3_CBA"},
+                {"text": "Pass through quickly", "next": "scene3_CBB"}
+            ],
+            "image": None
+        },
+        # Third level decisions - just adding placeholders for depth
+        "scene3_AAA": {
+            "title": "Ancient Wisdom",
+            "description": "The whispers reveal secrets of the mine and warn of the dangers ahead. You learn of three guardians: a serpent-woman, a swamp creature, and a dragon.",
+            "options": [
+                {"text": "Heed the warning", "next": "scene4_AAAA"},
+                {"text": "Ignore and proceed", "next": "scene4_AAAB"}
+            ],
+            "image": None
+        },
+        "scene3_AAB": {
+            "title": "Chamber of Echoes",
+            "description": "You enter a chamber where your footsteps echo strangely, as if the room is much larger than it appears. Shadows seem to move at the edges of your torchlight.",
+            "options": [
+                {"text": "Move silently", "next": "scene4_AABA"},
+                {"text": "Call out", "next": "scene4_AABB"}
+            ],
+            "image": None
+        },
+        "scene3_ABA": {
+            "title": "Narrow Escape",
+            "description": "Moving carefully through the crumbling passage, you manage to avoid triggering a cave-in. Ahead, you spot a fork in the path.",
+            "options": [
+                {"text": "Go up", "next": "scene4_ABAA"},
+                {"text": "Go down", "next": "scene4_ABAB"}
+            ],
+            "image": None
+        },
+        "scene3_ABB": {
+            "title": "Falling Debris",
+            "description": "Rushing through the unstable passage causes rocks to fall. You narrowly escape being crushed, but your torch is damaged, dimming its light.",
+            "options": [
+                {"text": "Find new light source", "next": "scene4_ABBA"},
+                {"text": "Continue in dim light", "next": "scene4_ABBB"}
+            ],
+            "image": None
+        },
+        "scene3_BAA": {
+            "title": "Vision Quest",
+            "description": "Following the vision, you navigate through a maze of tunnels with uncanny precision. The mushrooms' influence reveals hidden dangers and shortcuts.",
+            "options": [
+                {"text": "Take the shortcut", "next": "scene4_BAAA"},
+                {"text": "Avoid the dangers", "next": "scene4_BAAB"}
+            ],
+            "image": None
+        },
+        "scene3_BAB": {
+            "title": "Mental Clarity",
+            "description": "Resisting the vision, your mind clears. You notice details you missed before: ancient runes carved into the floor that seem to form a map.",
+            "options": [
+                {"text": "Follow the map", "next": "scene4_BABA"},
+                {"text": "Create your own path", "next": "scene4_BABB"}
+            ],
+            "image": None
+        },
+        "scene3_BBA": {
+            "title": "Spore Avoidance",
+            "description": "Holding your breath, you pass through the cloud unaffected. The tunnel beyond splits in two directions, both dimly illuminated by mushrooms.",
+            "options": [
+                {"text": "Left path", "next": "scene4_BBAA"},
+                {"text": "Right path", "next": "scene4_BBAB"}
+            ],
+            "image": None
+        },
+        "scene3_BBB": {
+            "title": "Spore Inhalation",
+            "description": "Running through the cloud, you inhale the spores. Your vision blurs, but your other senses sharpen. You perceive things beyond normal sight.",
+            "options": [
+                {"text": "Trust enhanced senses", "next": "scene4_BBBA"},
+                {"text": "Fight the hallucinations", "next": "scene4_BBBB"}
+            ],
+            "image": None
+        },
+        "scene3_CAA": {
+            "title": "Bridge Crossing",
+            "description": "The narrow stone bridge creaks under your weight. Halfway across, you hear a roar from the depths below. Something stirs in the lava.",
+            "options": [
+                {"text": "Run to the other side", "next": "scene4_CAAA"},
+                {"text": "Stand perfectly still", "next": "scene4_CAAB"}
+            ],
+            "image": None
+        },
+        "scene3_CAB": {
+            "title": "Alternative Route",
+            "description": "Seeking another way, you discover a narrow ledge running along the cavern wall. It looks precarious but might be safer than the bridge.",
+            "options": [
+                {"text": "Edge along the ledge", "next": "scene4_CABA"},
+                {"text": "Look for another option", "next": "scene4_CABB"}
+            ],
+            "image": None
+        },
+        "scene3_CBA": {
+            "title": "Crystal Examination",
+            "description": "Examining the crystals reveals they respond to your touch, changing colors and emitting soft tones. They seem to form a pattern or puzzle.",
+            "options": [
+                {"text": "Solve the puzzle", "next": "scene4_CBAA"},
+                {"text": "Collect some crystals", "next": "scene4_CBAB"}
+            ],
+            "image": None
+        },
+        "scene3_CBB": {
+            "title": "Quick Passage",
+            "description": "Moving quickly through the crystal cavern, you notice the reflections in the crystals don't always match your movements. Something watches from within.",
+            "options": [
+                {"text": "Investigate reflections", "next": "scene4_CBBA"},
+                {"text": "Exit the cavern quickly", "next": "scene4_CBBB"}
+            ],
+            "image": None
+        },
+
+        # Fourth level decisions (simplified for brevity)
+        "scene4_AAAA": {
+            "title": "Prepared Adventurer",
+            "description": "The whispers guided you well. You're mentally prepared for what lies ahead and have learned valuable information about the mine's guardians.",
+            "options": [
+                {"text": "Prepare for encounter", "next": "scene5_AAAAA"},
+                {"text": "Find alternate exit", "next": "scene5_AAAAB"}
+            ],
+            "image": None
+        },
+        # Add more fourth level scenes as needed...
+
+        # Fifth level scenes (lead to boss fights)
+        "scene5_AAAAA": {
+            "title": "Guardian's Territory",
+            "description": "You've reached the territory of one of the mine's guardians. The whispers warned you about this creature.",
+            "options": [
+                {"text": "Face the guardian", "next": "boss_medusa"},
+                {"text": "Try to sneak past", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+
+        # Generic fourth and fifth level scenes to ensure all paths work
+        "scene4_AABA": {"title": "Further In", "description": "You continue deeper into the mine.",
+                        "options": [{"text": "Go left", "next": "scene5_AABAA"},
+                                    {"text": "Go right", "next": "scene5_AABAB"}], "image": None},
+        "scene4_AABB": {"title": "Mysterious Response", "description": "Something responds to your call.",
+                        "options": [{"text": "Approach", "next": "scene5_AABBA"},
+                                    {"text": "Hide", "next": "scene5_AABBB"}], "image": None},
+        "scene4_ABAA": {"title": "Ascending Path", "description": "The path leads upward.",
+                        "options": [{"text": "Continue", "next": "scene5_ABAAA"},
+                                    {"text": "Turn back", "next": "scene5_ABAAB"}], "image": None},
+        "scene4_ABAB": {"title": "Descending Path", "description": "The path leads downward.",
+                        "options": [{"text": "Continue", "next": "scene5_ABABA"},
+                                    {"text": "Turn back", "next": "scene5_ABABB"}], "image": None},
+        "scene4_ABBA": {"title": "New Light", "description": "You find a new light source.",
+                        "options": [{"text": "Examine", "next": "scene5_ABBAA"},
+                                    {"text": "Take it", "next": "scene5_ABBAB"}], "image": None},
+        "scene4_ABBB": {"title": "Growing Darkness", "description": "The light dims further.",
+                        "options": [{"text": "Proceed carefully", "next": "scene5_ABBBA"},
+                                    {"text": "Feel your way", "next": "scene5_ABBBB"}], "image": None},
+        "scene4_BAAA": {"title": "Vision Shortcut", "description": "The shortcut revealed by your vision.",
+                        "options": [{"text": "Follow it", "next": "scene5_BAAAA"},
+                                    {"text": "Question it", "next": "scene5_BAAAB"}], "image": None},
+
+        # Generic fifth level scenes all lead to appropriate boss
+        "scene5_AABAA": {"title": "Final Approach", "description": "You're nearing the end of your journey.",
+                         "options": [{"text": "Press on", "next": "boss_medusa"},
+                                     {"text": "Be cautious", "next": "boss_medusa"}], "image": None},
+        "scene5_AABAB": {"title": "Last Decision", "description": "One final choice before facing your destiny.",
+                         "options": [{"text": "Be brave", "next": "boss_medusa"},
+                                     {"text": "Be smart", "next": "boss_medusa"}], "image": None},
+        "scene5_AABBA": {"title": "Meeting Fate", "description": "Time to face what awaits you.",
+                         "options": [{"text": "Stand firm", "next": "boss_swamp"},
+                                     {"text": "Approach slowly", "next": "boss_swamp"}], "image": None},
+        "scene5_AABBB": {"title": "Inevitable Confrontation", "description": "There's no avoiding this encounter.",
+                         "options": [{"text": "Face it head on", "next": "boss_swamp"},
+                                     {"text": "Ready yourself", "next": "boss_swamp"}], "image": None},
+        "scene5_ABAAA": {"title": "Point of No Return", "description": "The final stretch of your journey.",
+                         "options": [{"text": "Step forward", "next": "boss_swamp"},
+                                     {"text": "Take a moment", "next": "boss_swamp"}], "image": None},
+        "scene5_ABAAB": {"title": "Deadline Decision", "description": "It's time to face what lies ahead.",
+                         "options": [{"text": "Accept your fate", "next": "boss_dragon"},
+                                     {"text": "Prepare for battle", "next": "boss_dragon"}], "image": None},
+        "scene5_ABABA": {"title": "Final Destination", "description": "The end of your path through the mine.",
+                         "options": [{"text": "Enter cautiously", "next": "boss_dragon"},
+                                     {"text": "Enter boldly", "next": "boss_dragon"}], "image": None},
+        "scene5_ABABB": {"title": "No Way Back", "description": "Forward is the only option now.",
+                         "options": [{"text": "Steel yourself", "next": "boss_dragon"},
+                                     {"text": "Rush in", "next": "boss_dragon"}], "image": None},
+
+        # Fill in remaining fifth level scenes automatically
+        "scene5_ABBAA": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_medusa"},
+                                     {"text": "Stay alert", "next": "boss_medusa"}], "image": None},
+        "scene5_ABBAB": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_swamp"},
+                                     {"text": "Stay alert", "next": "boss_swamp"}], "image": None},
+        "scene5_ABBBA": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_dragon"},
+                                     {"text": "Stay alert", "next": "boss_dragon"}], "image": None},
+        "scene5_ABBBB": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_dragon"},
+                                     {"text": "Stay alert", "next": "boss_dragon"}], "image": None},
+        "scene5_ABBBB": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_medusa"},
+                                     {"text": "Stay alert", "next": "boss_medusa"}], "image": None},
+        "scene5_BAAAA": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_swamp"},
+                                     {"text": "Stay alert", "next": "boss_swamp"}], "image": None},
+        "scene5_BAAAB": {"title": "Final Path", "description": "The end is near.",
+                         "options": [{"text": "Go forward", "next": "boss_dragon"},
+                                     {"text": "Stay alert", "next": "boss_dragon"}], "image": None},
+
+        # Boss scenes
+        "boss_medusa": {
+            "title": "The Serpent Queen",
+            "description": "Before you stands a woman with snakes for hair. Her cold gaze threatens to turn you to stone. You must defeat Medusa to escape the mine.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_medusa"},
+                {"text": "Begin battle", "next": "combat_medusa"}
+            ],
+            "image": None
+        },
+        "boss_swamp": {
+            "title": "The Swamp Horror",
+            "description": "A monstrous creature rises from a pool of toxic sludge. Its body drips with poison, and tentacles reach for you. You must defeat this horror to escape the mine.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_swamp"},
+                {"text": "Begin battle", "next": "combat_swamp"}
+            ],
+            "image": None
+        },
+        "boss_dragon": {
+            "title": "The Mine Dragon",
+            "description": "A massive dragon emerges from the depths, scales glittering in your torchlight. Smoke curls from its nostrils, and its eyes fix on you. You must defeat the dragon to escape the mine.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_dragon"},
+                {"text": "Begin battle", "next": "combat_dragon"}
+            ],
+            "image": None
+        },
+        "victory": {
+            "title": "Freedom at Last",
+            "description": "With the guardian defeated, your path to freedom is clear. You emerge from the mine into sunlight, bruised but alive. Your adventure in the dark depths is over... for now.",
+            "options": [
+                {"text": "Play again", "next": "start"},
+                {"text": "Play again", "next": "start"}
+            ],
+            "image": None
+        },
+        "defeat": {
+            "title": "The Darkness Claims You",
+            "description": "Your strength fails as the guardian delivers a final blow. The darkness of the mine closes in, and your adventure ends here... But perhaps another brave soul will attempt escape.",
+            "options": [
+                {"text": "Try again", "next": "start"},
+                {"text": "Try again", "next": "start"}
+            ],
+            "image": None
+        }
+    }
+
+    # Write the scenes to a file
+    with open('scenes.json', 'w') as f:
+        json.dump(scenes, f, indent=4)
+
+    return scenes
+
+
+# Draw card selection for combat
+def draw_combat_cards(surface, cards, combat_system):
+    card_width, card_height = 150, 200
+    cards_start_x = (WIDTH - (len(cards) * (card_width + 20) - 20)) // 2
+
+    for i, card in enumerate(cards):
+        # Draw card background
+        card_x = cards_start_x + i * (card_width + 20)
+        card_y = HEIGHT - card_height - 50
+
+        # Create card surface with rounded corners
+        card_surface = pygame.Surface((card_width, card_height), pygame.SRCALPHA)
+        pygame.draw.rect(card_surface, CARD_BEIGE, (0, 0, card_width, card_height), border_radius=10)
+        pygame.draw.rect(card_surface, CARD_BROWN, (0, 0, card_width, card_height), 3, border_radius=10)
+
+        # Card title
+        title_text = font_subtitle.render(card["name"], True, BLACK)
+        title_rect = title_text.get_rect(center=(card_width // 2, 30))
+        card_surface.blit(title_text, title_rect)
+
+        # Card type
+        type_color = BLUE
+        if card["type"] == "attack":
+            type_color = RED
+        elif card["type"] == "heal":
+            type_color = GREEN
+
+        type_text = font_body.render(card["type"].capitalize(), True, type_color)
+        type_rect = type_text.get_rect(center=(card_width // 2, 60))
+        card_surface.blit(type_text, type_rect)
+
+        # Card effect
+        if "damage" in card:
+            effect_text = font_body.render(f"DMG: {card['damage']}", True, BLACK)
+        elif "heal" in card:
+            effect_text = font_body.render(f"HEAL: {card['heal']}", True, BLACK)
+        elif "defense" in card:
+            effect_text = font_body.render(f"DEF: {card['defense']}", True, BLACK)
+        else:
+            effect_text = font_body.render("Special", True, BLACK)
+
+        effect_rect = effect_text.get_rect(center=(card_width // 2, 100))
+        card_surface.blit(effect_text, effect_rect)
+
+        # Add card to screen
+        surface.blit(card_surface, (card_x, card_y))
+
+        # Highlight cards when it's player's turn
+        if combat_system.current_turn == "player":
+            # Create a rect for click detection
+            card_rect = pygame.Rect(card_x, card_y, card_width, card_height)
+
+            # Check if mouse is hovering over card
+            mouse_pos = pygame.mouse.get_pos()
+            if card_rect.collidepoint(mouse_pos):
+                # Draw highlight
+                pygame.draw.rect(surface, GOLD, (card_x - 5, card_y - 5, card_width + 10, card_height + 10), 3,
+                                 border_radius=15)
+
+
+# Draw health bars
+def draw_health_bars(surface, player_health, boss_health):
+    # Player health bar
+    pygame.draw.rect(surface, GRAY, (50, 50, 200, 30))
+    pygame.draw.rect(surface, GREEN, (50, 50, player_health * 2, 30))
+    pygame.draw.rect(surface, WHITE, (50, 50, 200, 30), 2)
+    health_text = font_body.render(f"Player: {player_health}/100", True, WHITE)
+    surface.blit(health_text, (60, 55))
+
+    # Boss health bar
+    pygame.draw.rect(surface, GRAY, (WIDTH - 250, 50, 200, 30))
+    pygame.draw.rect(surface, RED, (WIDTH - 250, 50, boss_health * 200 / 150, 30))
+    pygame.draw.rect(surface, WHITE, (WIDTH - 250, 50, 200, 30), 2)
+    health_text = font_body.render(f"Boss: {boss_health}/150", True, WHITE)
+    surface.blit(health_text, (WIDTH - 240, 55))
+
+
+# Draw boss
+def draw_boss(surface, boss_type):
+    if boss_type == "medusa":
+        color = (100, 200, 100)  # Green for Medusa
+    elif boss_type == "swamp":
+        color = (100, 100, 50)  # Muddy for Swamp horror
+    else:  # dragon
+        color = (200, 50, 50)  # Red for Dragon
+
+    # Draw a simple representation of the boss
+    pygame.draw.ellipse(surface, color, (WIDTH // 2 - 100, HEIGHT // 2 - 150, 200, 150))
+    pygame.draw.rect(surface, color, (WIDTH // 2 - 50, HEIGHT // 2, 100, 100))
+
+    # Draw eyes
+    pygame.draw.circle(surface, WHITE, (WIDTH // 2 - 50, HEIGHT // 2 - 100), 20)
+    pygame.draw.circle(surface, WHITE, (WIDTH // 2 + 50, HEIGHT // 2 - 100), 20)
+    pygame.draw.circle(surface, BLACK, (WIDTH // 2 - 45, HEIGHT // 2 - 100), 10)
+    pygame.draw.circle(surface, BLACK, (WIDTH // 2 + 45, HEIGHT // 2 - 100), 10)
+
+
+# Main game function
+def main():
+    clock = pygame.time.Clock()
+    scenes = load_scenes()
+    game_state = GameState()
+    game_state.initialize_card(scenes)
+
+    combat_system = None
+    combat_active = False
+    game_over = False
+
+    # Main game loop
+    running = True
+    while running:
+        mouse_pos = pygame.mouse.get_pos()
+
+        # Event handling
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            # Handle card events in story mode
+            if game_state.card and not combat_active and not game_over:
+                game_state.card.handle_event(event, mouse_pos)
+
+                # Check if a decision was made
+                if game_state.card.decision_made:
+                    current_scene = scenes[game_state.current_scene]
+
+                    # Determine which option was chosen
+                    if game_state.card.decision == "left":
+                        choice = "A"
+                        next_scene = current_scene["options"][0]["next"]
+                    else:  # right
+                        choice = "B"
+                        next_scene = current_scene["options"][1]["next"]
+
+                    # Add to choices and set next scene
+                    game_state.add_choice(choice)
+                    game_state.next_scene = next_scene
+
+                    # Check if this is a combat transition
+                    if next_scene.startswith("combat_"):
+                        boss_type = next_scene.split("_")[1]
+                        combat_system = CombatSystem(boss_type)
+                        combat_active = True
+
+            # Handle combat card selection
+            if combat_active and combat_system.current_turn == "player" and event.type == pygame.MOUSEBUTTONDOWN:
+                card_width, card_height = 150, 200
+                cards_start_x = (WIDTH - (len(combat_system.player_cards) * (card_width + 20) - 20)) // 2
+                card_y = HEIGHT - card_height - 50
+
+                # Check which card was clicked
+                for i in range(len(combat_system.player_cards)):
+                    card_x = cards_start_x + i * (card_width + 20)
+                    card_rect = pygame.Rect(card_x, card_y, card_width, card_height)
+
+                    if card_rect.collidepoint(mouse_pos):
+                        combat_system.player_attack(i)
+                        break
+
+            # Handle game over buttons
+            if game_over and event.type == pygame.MOUSEBUTTONDOWN:
+                # Check for restart button click
+                restart_button_rect = pygame.Rect(WIDTH // 2 - 100, HEIGHT - 100, 200, 50)
+                if restart_button_rect.collidepoint(mouse_pos):
+                    # Reset game
+                    game_state = GameState()
+                    game_state.initialize_card(scenes)
+                    combat_system = None
+                    combat_active = False
+                    game_over = False
+
+        # Clear screen
+        screen.fill(BLACK)
+
+        # Update game state
+        if game_state.update() and not combat_active:
+            # If scene changed, initialize new card
+            game_state.initialize_card(scenes)
+
+        # Update card animation
+        if game_state.card and not combat_active and not game_over:
+            game_state.card.update(mouse_pos)
+
+        # Check for combat victory/defeat
+        if combat_active:
+            if combat_system.player_health <= 0:
+                combat_active = False
+                game_over = True
+                game_state.current_scene = "defeat"
+
+            elif combat_system.boss_health <= 0:
+                combat_active = False
+                game_over = True
+                game_state.current_scene = "victory"
+
+        # Draw game elements
+        if combat_active:
+            # Draw combat scene
+            draw_boss(screen, combat_system.boss_type)
+            draw_health_bars(screen, combat_system.player_health, combat_system.boss_health)
+            draw_combat_cards(screen, combat_system.player_cards, combat_system)
+
+            # Draw turn message
+            message_text = font_subtitle.render(combat_system.message, True, WHITE)
+            message_rect = message_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 150))
+            screen.blit(message_text, message_rect)
+
+            # Draw turn indicator
+            turn_text = font_title.render(f"{combat_system.current_turn.capitalize()}'s Turn", True, GOLD)
+            turn_rect = turn_text.get_rect(center=(WIDTH // 2, 20))
+            screen.blit(turn_text, turn_rect)
+
+        elif game_over:
+            # Draw game over screen
+            if game_state.current_scene == "victory":
+                title_text = font_title.render("VICTORY!", True, GOLD)
+            else:
+                title_text = font_title.render("DEFEAT!", True, RED)
+
+            title_rect = title_text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 100))
+            screen.blit(title_text, title_rect)
+
+            # Draw scene description
+            description = scenes[game_state.current_scene]["description"]
+            wrapped_lines = textwrap.wrap(description, width=70)
+            for i, line in enumerate(wrapped_lines):
+                line_surf = font_body.render(line, True, WHITE)
+                line_rect = line_surf.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 50 + i * 30))
+                screen.blit(line_surf, line_rect)
+
+            # Draw restart button
+            restart_button = Button(WIDTH // 2 - 100, HEIGHT - 100, 200, 50, "Play Again", BLUE, (100, 100, 200))
+            restart_button.update(mouse_pos)
+            restart_button.draw(screen)
+
+        elif game_state.card:
+            # Draw story mode card
+            game_state.card.draw(screen)
+
+            # Draw path info
+            if game_state.boss_path:
+                path_text = font_body.render(f"Path: {game_state.boss_path.capitalize()}", True, WHITE)
+                screen.blit(path_text, (20, 20))
+
+            # Draw decision counter
+            decisions_text = font_body.render(f"Decisions: {game_state.decision_count}/5", True, WHITE)
+            screen.blit(decisions_text, (20, 50))
+
+        # Update display
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.quit()
+    sys.exit()
+
+
+if __name__ == "__main__":
+    main()
