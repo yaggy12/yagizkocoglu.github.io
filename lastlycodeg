@@ -1,0 +1,215 @@
+},
+        "decision5_CBBAB": {
+            "title": "Waiting Game",
+            "description": "Waiting for an opening, you spot the dragon’s weak spot. You enter its lair, ready to strike with your pick.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Face the Dragon", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBBBA": {
+            "title": "Last Stand",
+            "description": "With no protection, you face the dragon in its lair. The flames are deadly, but you fight for survival.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Face the Dragon", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBBBB": {
+            "title": "Final Weapon",
+            "description": "You find a spear in the cavern and enter the dragon’s lair. It’s your last chance to defeat the beast.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Face the Dragon", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "boss_medusa": {
+            "title": "The Serpent Queen",
+            "description": "Medusa stands before you, snakes writhing in her hair. Her gaze could turn you to stone, but your choices have led you here. Defeat her to break the mine’s curse.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_medusa"},
+                {"text": "Begin battle", "next": "combat_medusa"}
+            ],
+            "image": None
+        },
+        "boss_swamp": {
+            "title": "The Swamp Horror",
+            "description": "The Swamp Horror rises from its toxic pool, tentacles lashing. The spores choke the air, but your journey has prepared you. Defeat it to escape the mine.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_swamp"},
+                {"text": "Begin battle", "next": "combat_swamp"}
+            ],
+            "image": None
+        },
+        "boss_dragon": {
+            "title": "The Mine Dragon",
+            "description": "The dragon towers over you, flames curling from its jaws. The mine shakes with its power, but your path has led to this. Defeat it to win your freedom.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_dragon"},
+                {"text": "Begin battle", "next": "combat_dragon"}
+            ],
+            "image": None
+        },
+        "victory": {
+            "title": "Freedom Earned",
+            "description": "The guardian falls, and the mine’s curse lifts. You stumble into sunlight, scarred but alive. Your choices shaped your escape, a tale for the ages.",
+            "options": [
+                {"text": "Play again", "next": "start"},
+                {"text": "Play again", "next": "start"}
+            ],
+            "image": None
+        }
+    }
+    try:
+        with open('scenes.json', 'w') as f:
+            json.dump(scenes, f, indent=4)
+    except Exception as e:
+        print(f"Error writing scenes.json: {e}")
+    return scenes
+
+
+def main():
+    clock = pygame.time.Clock()
+    scenes = create_scenes_file()
+    game_state = GameState()
+    combat_system = None
+    buttons = [
+        Button(WIDTH // 2 - 100, HEIGHT // 2 - 50, 200, 60, "Play", BLUE, GREEN),
+        Button(WIDTH // 2 - 100, HEIGHT // 2 + 20, 200, 60, "Continue", BLUE, GREEN),
+        Button(WIDTH // 2 - 100, HEIGHT // 2 + 90, 200, 60, "Quit", BLUE, RED)
+    ]
+    defeat_buttons = [
+        Button(WIDTH // 2 - 100, HEIGHT // 2 + 20, 200, 60, "Menu", BLUE, GREEN),
+        Button(WIDTH // 2 - 100, HEIGHT // 2 + 90, 200, 60, "Quit", BLUE, RED)
+    ]
+
+    while True:
+        mouse_pos = pygame.mouse.get_pos()
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if game_state.game_mode == "menu":
+                for button in buttons:
+                    if button.is_clicked(mouse_pos, event):
+                        if button.text == "Play":
+                            game_state = GameState()
+                            game_state.initialize_card(scenes)
+                            game_state.game_mode = "story"
+                        elif button.text == "Continue":
+                            game_state = GameState()
+                            if game_state.load_progress(scenes):
+                                game_state.game_mode = "story"
+                                if game_state.current_scene.startswith("boss_"):
+                                    combat_system = CombatSystem(game_state.boss_path, game_state.player)
+                                    game_state.game_mode = "combat"
+                        elif button.text == "Quit":
+                            pygame.quit()
+                            sys.exit()
+
+            elif game_state.game_mode == "story":
+                if game_state.card:
+                    game_state.card.handle_event(event, mouse_pos)
+                    if game_state.card.decision_made:
+                        choice = "A" if game_state.card.decision == "left" else "B" if game_state.card.decision == "right" else "C"
+                        options = scenes[game_state.current_scene]["options"]
+                        next_scene = options[0]["next"] if choice == "A" else options[1]["next"] if choice == "B" else \
+                        options[2]["next"] if choice == "C" else options[0]["next"]
+                        game_state.add_choice(choice, scenes)
+                        game_state.next_scene = next_scene
+                        game_state.card = None
+
+            elif game_state.game_mode == "combat" and combat_system:
+                if combat_system.current_turn == "player" and combat_system.player.can_act:
+                    if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                        card_width, card_height = 150, 200
+                        cards_start_x = (WIDTH - (len(combat_system.player.hand) * (card_width + 20) - 20)) // 2
+                        for i in range(len(combat_system.player.hand)):
+                            card_x = cards_start_x + i * (card_width + 20)
+                            card_y = HEIGHT - card_height - 50
+                            card_rect = pygame.Rect(card_x, card_y, card_width, card_height)
+                            if card_rect.collidepoint(mouse_pos):
+                                combat_system.player_attack(i)
+                                break
+
+            elif game_state.game_mode == "defeat":
+                for button in defeat_buttons:
+                    if button.is_clicked(mouse_pos, event):
+                        if button.text == "Menu":
+                            game_state = GameState()
+                            game_state.game_mode = "menu"
+                            combat_system = None
+                        elif button.text == "Quit":
+                            pygame.quit()
+                            sys.exit()
+
+        # Update
+        for button in buttons:
+            button.update(mouse_pos)
+        for button in defeat_buttons:
+            button.update(mouse_pos)
+
+        if game_state.game_mode == "story":
+            if game_state.update():
+                if game_state.current_scene.startswith("boss_"):
+                    combat_system = CombatSystem(game_state.boss_path, game_state.player)
+                    game_state.game_mode = "combat"
+                else:
+                    game_state.initialize_card(scenes)
+        elif game_state.game_mode == "combat" and combat_system:
+            combat_system.update()
+            if combat_system.player.health <= 0:
+                game_state.game_mode = "defeat"
+                combat_system = None
+            elif combat_system.enemy.health <= 0:
+                game_state.current_scene = "victory"
+                game_state.game_mode = "story"
+                game_state.initialize_card(scenes)
+                combat_system = None
+
+        # Draw
+        screen.fill(BLACK)
+
+        if game_state.game_mode == "menu":
+            title_text = font_title.render("The King: Card Adventure", True, GOLD)
+            title_rect = title_text.get_rect(center=(WIDTH // 2, HEIGHT // 4))
+            screen.blit(title_text, title_rect)
+            for button in buttons:
+                button.draw(screen)
+
+        elif game_state.game_mode == "story":
+            if game_state.card:
+                game_state.card.update(mouse_pos)
+                game_state.card.draw(screen)
+
+        elif game_state.game_mode == "combat" and combat_system:
+            draw_boss(screen, combat_system.boss_type)
+            draw_health_bars(screen, combat_system.player.health, combat_system.enemy.health,
+                             combat_system.enemy.max_health, combat_system)
+            draw_combat_cards(screen, combat_system.player.hand, combat_system)
+            if combat_system.message_timer > 0:
+                message_text = font_body.render(combat_system.message, True, WHITE)
+                message_rect = message_text.get_rect(center=(WIDTH // 2, HEIGHT - 300))
+                screen.blit(message_text, message_rect)
+
+        elif game_state.game_mode == "defeat":
+            defeat_text = font_title.render("Defeat", True, RED)
+            defeat_rect = defeat_text.get_rect(center=(WIDTH // 2, HEIGHT // 4))
+            screen.blit(defeat_text, defeat_rect)
+            message_text = font_body.render("The guardian has bested you. The mine's curse claims another soul.", True,
+                                            WHITE)
+            message_rect = message_text.get_rect(center=(WIDTH // 2, HEIGHT // 3))
+            screen.blit(message_text, message_rect)
+            for button in defeat_buttons:
+                button.draw(screen)
+
+        pygame.display.flip()
+        clock.tick(60)
+
+
+if __name__ == "__main__":
+    main()
