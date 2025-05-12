@@ -1,4 +1,1374 @@
-"victory": {
+import pygame
+import sys
+import json
+import os
+import textwrap
+import random
+
+# Constants
+WIDTH, HEIGHT = 1280, 720
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+BLUE = (0, 0, 255)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+GOLD = (255, 215, 0)
+CARD_BEIGE = (245, 245, 220)
+CARD_BROWN = (139, 69, 19)
+
+try:
+    pygame.init()
+except Exception as e:
+    print(f"Error: Failed to initialize Pygame: {e}")
+    sys.exit(1)
+
+try:
+    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    pygame.display.set_caption("The King: Card Adventure")
+except Exception as e:
+    print(f"Error: Failed to set display mode: {e}")
+    pygame.quit()
+    sys.exit(1)
+
+try:
+    font_title = pygame.font.Font(None, 72)
+    font_body = pygame.font.Font(None, 36)
+except Exception as e:
+    print(f"Error: Failed to load fonts: {e}")
+    pygame.quit()
+    sys.exit(1)
+
+# Item Classes
+class Weapon:
+    def __init__(self, name, damage):
+        self.name = name
+        self.damage = damage
+
+class Armor:
+    def __init__(self, name, defense):
+        self.name = name
+        self.defense = defense
+
+class Shield:
+    def __init__(self, name, block):
+        self.name = name
+        self.block = block
+
+# Player Class
+class Player:
+    def __init__(self):
+        self.health = 100
+        self.max_health = 100
+        self.stamina = 6
+        self.max_stamina = 6
+        self.inventory = []
+        self.hand = []
+        self.can_act = True
+        self.block_amount = 0
+
+    def equip_item(self, item):
+        self.inventory.append(item)
+
+    def take_damage(self, damage):
+        damage = max(0, damage - self.block_amount)
+        total_defense = sum(item.defense for item in self.inventory if isinstance(item, Armor))
+        total_block = sum(item.block for item in self.inventory if isinstance(item, Shield))
+        damage_taken = max(0, damage - total_defense - total_block)
+        self.health = max(0, self.health - damage_taken)
+        self.block_amount = 0
+        return damage_taken
+
+    def attack(self, card_index, enemy):
+        if 0 <= card_index < len(self.hand):
+            card = self.hand[card_index]
+            if self.stamina >= card["cost"]:
+                self.stamina -= card["cost"]
+                if card["name"] == "Block":
+                    self.block_amount += card["block"]
+                else:
+                    total_damage = card["damage"] + sum(item.damage for item in self.inventory if isinstance(item, Weapon))
+                    enemy.take_damage(total_damage)
+                self.hand.pop(card_index)
+                if self.stamina <= 0:
+                    self.take_damage(10)  # Damage for stamina depletion
+                    self.stamina = self.max_stamina  # Reset to full stamina
+                    self.take_damage(10)  # Extra damage for stamina reset
+                    return True, "Exhausted! Took 10 damage total, stamina restored."
+                return True, f"Played {card['name']} {'for ' + str(card['damage']) + ' damage' if card['damage'] > 0 else 'to block ' + str(card['block']) + ' damage'}!"
+        return False, "Not enough stamina!"
+
+# Enemy Class
+class Enemy:
+    def __init__(self, boss_type):
+        self.boss_type = boss_type
+        if boss_type == "medusa":
+            self.health = 150
+            self.max_health = 150
+            self.attack_power = 20
+        elif boss_type == "swamp":
+            self.health = 180
+            self.max_health = 180
+            self.attack_power = 15
+        elif boss_type == "dragon":
+            self.health = 165
+            self.max_health = 165
+            self.attack_power = 25
+        self.next_attack = 0
+
+    def take_damage(self, damage):
+        self.health = max(0, self.health - damage)
+
+    def get_next_attack(self):
+        damage = self.attack_power
+        if self.boss_type == "medusa" and random.random() < 0.4:
+            damage += 10
+        elif self.boss_type == "swamp" and random.random() < 0.3:
+            damage += 8
+        elif self.boss_type == "dragon" and random.random() < 0.25:
+            damage += 15
+        return damage
+
+    def attack(self, player):
+        damage = self.get_next_attack()
+        return player.take_damage(damage)
+
+# CombatSystem Class
+class CombatSystem:
+    def __init__(self, boss_type, player):
+        self.boss_type = boss_type
+        self.player = player
+        self.enemy = Enemy(boss_type)
+        self.current_turn = "player"
+        self.message = ""
+        self.message_timer = 0
+        self.deck = [
+            {"name": "Strike", "damage": 10, "cost": 1, "block": 0},
+            {"name": "Heavy Strike", "damage": 20, "cost": 2, "block": 0},
+            {"name": "Block", "damage": 0, "cost": 1, "block": 15},
+            {"name": "Quick Strike", "damage": 8, "cost": 1, "block": 0}
+        ] * 5
+        random.shuffle(self.deck)
+        self.player.hand = []
+        # Apply initial stamina reset damage
+        self.player.stamina = self.player.max_stamina
+        self.player.take_damage(10)  # Extra damage for initial stamina set to 6
+        self.message = "Combat begins! Took 10 damage for stamina reset."
+        self.message_timer = 60
+        self.begin_turn()
+
+    def begin_turn(self):
+        self.player.can_act = True
+        while len(self.player.hand) < 5 and self.deck:
+            self.player.hand.append(self.deck.pop())
+        if self.current_turn == "player":
+            self.enemy.next_attack = self.enemy.get_next_attack()
+        if not self.player.hand:
+            self.player.can_act = False
+
+    def player_attack(self, card_index):
+        if self.player.can_act and 0 <= card_index < len(self.player.hand):
+            card = self.player.hand[card_index]
+            success, message = self.player.attack(card_index, self.enemy)
+            self.message = message
+            self.message_timer = 60
+            if success and self.enemy.health > 0:
+                self.current_turn = "enemy"
+            return success
+        return False
+
+    def update(self):
+        if self.message_timer > 0:
+            self.message_timer -= 1
+        if self.current_turn == "enemy" and self.enemy.health > 0:
+            damage = self.enemy.attack(self.player)
+            self.message = f"{self.boss_type.capitalize()} deals {damage} damage!"
+            self.message_timer = 60
+            self.current_turn = "player"
+            self.begin_turn()
+
+# Button Class
+class Button:
+    def __init__(self, x, y, width, height, text, idle_color, hover_color):
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.idle_color = idle_color
+        self.hover_color = hover_color
+        self.current_color = idle_color
+
+    def update(self, mouse_pos):
+        self.current_color = self.hover_color if self.rect.collidepoint(mouse_pos) else self.idle_color
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.current_color, self.rect, border_radius=10)
+        text = font_body.render(self.text, True, WHITE)
+        text_rect = text.get_rect(center=self.rect.center)
+        surface.blit(text, text_rect)
+
+    def is_clicked(self, mouse_pos, event):
+        return event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(mouse_pos)
+
+# SwipeCard Class
+class SwipeCard:
+    def __init__(self, width, height, content, disable_down_swipe=False):
+        self.width = width
+        self.height = height
+        self.content = content
+        self.disable_down_swipe = disable_down_swipe
+        self.x = (WIDTH - width) // 2
+        self.y = (HEIGHT - height) // 2
+        self.target_x = self.x
+        self.target_y = self.y
+        self.grabbed = False
+        self.grab_offset_x = 0
+        self.grab_offset_y = 0
+        self.rotation = 0
+        self.decision_made = False
+        self.decision = None
+        self.surface = self.create_surface()
+        self.swipe_threshold_x = width * 0.3
+        self.swipe_threshold_y = height * 0.3
+
+    def create_surface(self):
+        card = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        card.fill(CARD_BEIGE)
+        pygame.draw.rect(card, CARD_BROWN, (0, 0, self.width, self.height), 10, border_radius=20)
+
+        title = font_title.render(self.content["title"], True, BLACK)
+        title_rect = title.get_rect(center=(self.width // 2, 60))
+        card.blit(title, title_rect)
+
+        wrapped_text = textwrap.wrap(self.content["description"], width=45)
+        for i, line in enumerate(wrapped_text[:5]):
+            text = font_body.render(line, True, BLACK)
+            text_rect = text.get_rect(center=(self.width // 2, 140 + i * 40))
+            card.blit(text, text_rect)
+
+        if "options" in self.content and len(self.content["options"]) >= 2:
+            left_option = font_body.render(f"← {self.content['options'][0]['text']}", True, RED)
+            right_option = font_body.render(f"{self.content['options'][1]['text']} →", True, GREEN)
+            card.blit(left_option, (30, self.height - 60))
+            card.blit(right_option, (self.width - right_option.get_width() - 30, self.height - 60))
+            if not self.disable_down_swipe and len(self.content["options"]) >= 3:
+                down_option = font_body.render(f"↓ {self.content['options'][2]['text']}", True, BLUE)
+                card.blit(down_option, (self.width // 2 - down_option.get_width() // 2, self.height - 30))
+
+        return card
+
+    def handle_event(self, event, mouse_pos):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            card_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+            if card_rect.collidepoint(mouse_pos):
+                self.grabbed = True
+                self.grab_offset_x = mouse_pos[0] - self.x
+                self.grab_offset_y = mouse_pos[1] - self.y
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            if self.grabbed:
+                self.grabbed = False
+                x_offset = self.x - ((WIDTH - self.width) // 2)
+                y_offset = self.y - ((HEIGHT - self.height) // 2)
+                if x_offset < -self.swipe_threshold_x:
+                    self.decision = "left"
+                    self.decision_made = True
+                    self.target_x = -self.width
+                elif x_offset > self.swipe_threshold_x:
+                    self.decision = "right"
+                    self.decision_made = True
+                    self.target_x = WIDTH
+                elif not self.disable_down_swipe and y_offset > self.swipe_threshold_y:
+                    self.decision = "down"
+                    self.decision_made = True
+                    self.target_y = HEIGHT
+                else:
+                    self.target_x = (WIDTH - self.width) // 2
+                    self.target_y = (HEIGHT - self.height) // 2
+
+    def update(self, mouse_pos):
+        if self.grabbed:
+            self.x = mouse_pos[0] - self.grab_offset_x
+            self.y = mouse_pos[1] - self.grab_offset_y
+            center_offset = self.x - ((WIDTH - self.width) // 2)
+            self.rotation = center_offset * 0.05
+        else:
+            diff_x = self.target_x - self.x
+            diff_y = self.target_y - self.y
+            self.x += diff_x * 0.2
+            self.y += diff_y * 0.2
+            center_offset = self.x - ((WIDTH - self.width) // 2)
+            self.rotation = center_offset * 0.05
+
+    def draw(self, surface):
+        rotated_card = pygame.transform.rotate(self.surface, self.rotation)
+        rotated_rect = rotated_card.get_rect(center=(self.x + self.width // 2, self.y + self.height // 2))
+        surface.blit(rotated_card, rotated_rect.topleft)
+        x_offset = self.x - ((WIDTH - self.width) // 2)
+        y_offset = self.y - ((HEIGHT - self.height) // 2)
+        if x_offset < -10:
+            pygame.draw.rect(surface, (255, 0, 0, min(abs(x_offset) / 2, 100)),
+                             (50, 50, 100, HEIGHT - 100), border_radius=10)
+        elif x_offset > 10:
+            pygame.draw.rect(surface, (0, 255, 0, min(abs(x_offset) / 2, 100)),
+                             (WIDTH - 150, 50, 100, HEIGHT - 100), border_radius=10)
+        elif not self.disable_down_swipe and y_offset > 10:
+            pygame.draw.rect(surface, (0, 0, 255, min(abs(y_offset) / 2, 100)),
+                             (WIDTH // 2 - 50, HEIGHT - 150, 100, 100), border_radius=10)
+
+# GameState Class
+class GameState:
+    def __init__(self):
+        self.current_scene = "start"
+        self.choices = []
+        self.boss_path = None
+        self.boss_defeated = False
+        self.decision_count = 0
+        self.card = None
+        self.next_scene = None
+        self.transition_timer = 0
+        self.game_mode = "menu"
+        self.player = Player()
+        self.first_decision_made = False
+
+    def initialize_card(self, scenes, disable_down_swipe=False):
+        if self.current_scene in scenes:
+            self.card = SwipeCard(800, 500, scenes[self.current_scene], disable_down_swipe=disable_down_swipe)
+        else:
+            print(f"Error: Scene '{self.current_scene}' not found. Falling back to start scene.")
+            self.current_scene = "start"
+            self.card = SwipeCard(800, 500, scenes[self.current_scene], disable_down_swipe=disable_down_swipe)
+
+    def add_choice(self, choice, scenes):
+        self.choices.append(choice)
+        self.decision_count += 1
+        if self.decision_count == 1:
+            self.first_decision_made = True
+            if choice == "A":
+                self.boss_path = "medusa"
+                self.player.equip_item(Weapon("Miner's Pick", 10))
+            elif choice == "B":
+                self.boss_path = "swamp"
+                self.player.equip_item(Weapon("Rusted Machete", 12))
+            elif choice == "C":
+                self.boss_path = "dragon"
+                self.player.equip_item(Shield("Charred Shield", 10))
+        if self.current_scene == "decision4_AAAA":
+            self.player.equip_item(Shield("Polished Shield", 15))
+        elif self.current_scene == "decision4_CABB":
+            self.player.equip_item(Armor("Fire-Resistant Cloak", 10))
+        elif self.current_scene == "decision4_BBBA":
+            self.player.equip_item(Weapon("Sharpened Bone", 15))
+        if self.decision_count >= 5 and not self.current_scene.startswith("boss_"):
+            self.next_scene = f"boss_{self.boss_path}"
+        self.save_progress()
+
+    def update(self):
+        if self.next_scene:
+            self.transition_timer += 1
+            if self.transition_timer > 30:
+                self.current_scene = self.next_scene
+                self.next_scene = None
+                self.transition_timer = 0
+                return True
+        return False
+
+    def save_progress(self):
+        progress = {
+            "current_scene": self.current_scene,
+            "choices": self.choices,
+            "boss_path": self.boss_path,
+            "decision_count": self.decision_count,
+            "player_health": self.player.health,
+            "player_stamina": self.player.stamina,
+            "player_inventory": [item.name for item in self.player.inventory]
+        }
+        try:
+            with open('progress.json', 'w') as f:
+                json.dump(progress, f, indent=4)
+        except Exception as e:
+            print(f"Error: Failed to save progress: {e}")
+
+    def load_progress(self, scenes):
+        try:
+            with open('progress.json', 'r') as f:
+                progress = json.load(f)
+                self.current_scene = progress.get("current_scene", "start")
+                self.choices = progress.get("choices", [])
+                self.boss_path = progress.get("boss_path")
+                self.decision_count = progress.get("decision_count", 0)
+                self.player.health = progress.get("player_health", 100)
+                self.player.stamina = progress.get("player_stamina", 6)
+                self.first_decision_made = self.decision_count > 0
+                self.initialize_card(scenes, disable_down_swipe=self.first_decision_made)
+                return True
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            self.current_scene = "start"
+            self.choices = []
+            self.boss_path = None
+            self.decision_count = 0
+            self.first_decision_made = False
+            self.player = Player()
+            self.initialize_card(scenes, disable_down_swipe=False)
+            return False
+
+# Draw Functions
+def draw_boss(screen, boss_type):
+    boss_text = font_title.render(boss_type.capitalize(), True, WHITE)
+    boss_rect = boss_text.get_rect(center=(WIDTH // 2, 100))
+    screen.blit(boss_text, boss_rect)
+
+def draw_health_bars(screen, player_health, enemy_health, enemy_max_health, combat_system):
+    player_bar_width = 300
+    player_bar_height = 20
+    player_fill_width = (player_health / 100) * player_bar_width
+    pygame.draw.rect(screen, RED, (50, 50, player_bar_width, player_bar_height))
+    pygame.draw.rect(screen, GREEN, (50, 50, player_fill_width, player_bar_height))
+    player_text = font_body.render(f"Player: {player_health}/100", True, WHITE)
+    screen.blit(player_text, (50, 30))
+
+    enemy_bar_width = 300
+    enemy_bar_height = 20
+    enemy_fill_width = (enemy_health / enemy_max_health) * enemy_bar_width
+    pygame.draw.rect(screen, RED, (WIDTH - 350, 50, enemy_bar_width, enemy_bar_height))
+    pygame.draw.rect(screen, GREEN, (WIDTH - 350, 50, enemy_fill_width, enemy_bar_height))
+    enemy_text = font_body.render(f"{combat_system.boss_type.capitalize()}: {enemy_health}/{enemy_max_health}", True, WHITE)
+    screen.blit(enemy_text, (WIDTH - 350, 30))
+
+def draw_combat_cards(screen, hand, combat_system):
+    card_width, card_height = 150, 200
+    cards_start_x = (WIDTH - (len(hand) * (card_width + 20) - 20)) // 2
+    for i, card in enumerate(hand):
+        card_x = cards_start_x + i * (card_width + 20)
+        card_y = HEIGHT - card_height - 50
+        pygame.draw.rect(screen, CARD_BEIGE, (card_x, card_y, card_width, card_height), border_radius=10)
+        pygame.draw.rect(screen, CARD_BROWN, (card_x, card_y, card_width, card_height), 5, border_radius=10)
+        name_text = font_body.render(card["name"], True, BLACK)
+        screen.blit(name_text, (card_x + 10, card_y + 10))
+        damage_text = font_body.render(f"DMG: {card['damage']}", True, BLACK)
+        screen.blit(damage_text, (card_x + 10, card_y + 50))
+        cost_text = font_body.render(f"Cost: {card['cost']}", True, BLACK)
+        screen.blit(cost_text, (card_x + 10, card_y + 90))
+        if card["block"] > 0:
+            block_text = font_body.render(f"Block: {card['block']}", True, BLACK)
+            screen.blit(block_text, (card_x + 10, card_y + 130))
+
+def create_scenes_file():
+    if os.path.exists('scenes.json'):
+        try:
+            with open('scenes.json', 'r') as f:
+                return json.load(f)
+        except Exception:
+            pass
+
+    scenes = {
+        "start": {
+            "title": "Trapped in the Cursed Mine",
+            "description": "You awake in a dark mine, head throbbing from a blow you don’t recall. Your miner’s pick lies nearby, and strange whispers echo through the tunnels. The mine feels alive, cursed. You must escape, but three paths lie ahead, each hinting at a different guardian.",
+            "options": [
+                {"text": "Snake-carved tunnel", "next": "decision1_A"},
+                {"text": "Mushroom-lit tunnel", "next": "decision1_B"},
+                {"text": "Scorched tunnel", "next": "decision1_C"}
+            ],
+            "image": None
+        },
+        "decision1_A": {
+            "title": "The Serpent’s Call",
+            "description": "The tunnel is damp, etched with snake carvings that seem to writhe in your torchlight. A sibilant whisper promises secrets but warns of a serpent queen. You find an old miner’s journal mentioning a ‘Medusa’ guarding the exit.",
+            "options": [
+                {"text": "Read the journal", "next": "decision2_AA"},
+                {"text": "Ignore it, proceed", "next": "decision2_AB"}
+            ],
+            "image": None
+        },
+        "decision2_AA": {
+            "title": "Ancient Warnings",
+            "description": "The journal describes Medusa’s petrifying gaze and suggests reflective surfaces might help. You pocket a small, cracked mirror from the journal’s pages. The tunnel narrows, and you hear slithering ahead.",
+            "options": [
+                {"text": "Use mirror to scout", "next": "decision3_AAA"},
+                {"text": "Move stealthily", "next": "decision3_AAB"}
+            ],
+            "image": None
+        },
+        "decision2_AB": {
+            "title": "Pressing Forward",
+            "description": "Ignoring the journal, you hurry on. The carvings grow more intricate, depicting a crowned serpent woman. The air grows colder, and you feel watched. A faint glow reveals a fork in the path.",
+            "options": [
+                {"text": "Follow the glow", "next": "decision3_ABA"},
+                {"text": "Stay in shadows", "next": "decision3_ABB"}
+            ],
+            "image": None
+        },
+        "decision3_AAA": {
+            "title": "Reflected Danger",
+            "description": "Using the mirror, you spot a snake slithering in the dark, avoiding its gaze. The tunnel opens to a chamber with stone statues, their faces frozen in terror. You sense Medusa’s presence growing stronger.",
+            "options": [
+                {"text": "Search for clues", "next": "decision4_AAAA"},
+                {"text": "Prepare for combat", "next": "decision4_AAAB"}
+            ],
+            "image": None
+        },
+        "decision3_AAB": {
+            "title": "Stealthy Advance",
+            "description": "Moving quietly, you avoid detection but miss potential clues. The tunnel leads to a chamber filled with statues, some holding weapons. Medusa’s hissing is closer now, echoing off the walls.",
+            "options": [
+                {"text": "Take a weapon", "next": "decision4_AABA"},
+                {"text": "Keep moving", "next": "decision4_AABB"}
+            ],
+            "image": None
+        },
+        "decision3_ABA": {
+            "title": "Glowing Path",
+            "description": "The glow leads to a shrine with a snake idol. Touching it triggers a vision of Medusa commanding snakes. You feel cursed but gain knowledge of her movements. The path continues toward her lair.",
+            "options": [
+                {"text": "Use vision to plan", "next": "decision4_ABAA"},
+                {"text": "Shake off the curse", "next": "decision4_ABAB"}
+            ],
+            "image": None
+        },
+        "decision3_ABB": {
+            "title": "Shadowed Path",
+            "description": "Staying in shadows, you avoid traps but feel the curse’s weight. You reach a chamber with statues and hear Medusa’s voice, taunting you to face her. The exit is near, but she blocks it.",
+            "options": [
+                {"text": "Confront her taunts", "next": "decision4_ABBA"},
+                {"text": "Search for exit", "next": "decision4_ABBB"}
+            ],
+            "image": None
+        },
+        "decision4_AAAA": {
+            "title": "Statue Clues",
+            "description": "Among the statues, you find a shield with a polished surface, perfect for reflecting Medusa’s gaze. Armed with the mirror and shield, you feel ready to face her. Her lair is just ahead.",
+            "options": [
+                {"text": "Enter the lair", "next": "decision5_AAAAA"},
+                {"text": "Set a trap", "next": "decision5_AAAAB"}
+            ],
+            "image": None
+        },
+        "decision4_AAAB": {
+            "title": "Combat Ready",
+            "description": "You sharpen your pick and brace for battle, relying on the mirror. The statue chamber leads to Medusa’s lair, where snakes slither in the dark. You hear her mocking laughter.",
+            "options": [
+                {"text": "Charge in", "next": "decision5_AAABA"},
+                {"text": "Wait for an opening", "next": "decision5_AAABB"}
+            ],
+            "image": None
+        },
+        "decision4_AABA": {
+            "title": "Armed with Stone",
+            "description": "You pry a sword from a statue’s grip. It’s heavy but sharp. Medusa’s hissing grows louder as you approach her lair, the air thick with her presence.",
+            "options": [
+                {"text": "Advance boldly", "next": "decision5_AABAA"},
+                {"text": "Move cautiously", "next": "decision5_AABAB"}
+            ],
+            "image": None
+        },
+        "decision4_AABB": {
+            "title": "No Weapon",
+            "description": "You bypass the statues, relying on your pick. Medusa’s lair is close, and her snakes are everywhere. You feel underprepared but determined to escape.",
+            "options": [
+                {"text": "Face her now", "next": "decision5_AABBA"},
+                {"text": "Find another way", "next": "decision5_AABBB"}
+            ],
+            "image": None
+        },
+        "decision4_ABAA": {
+            "title": "Vision Strategy",
+            "description": "Using the vision, you predict Medusa’s movements and find a hidden path to her lair. You’re cursed but confident. Her snakes guard the entrance.",
+            "options": [
+                {"text": "Sneak past snakes", "next": "decision5_ABAAA"},
+                {"text": "Fight through", "next": "decision5_ABAAB"}
+            ],
+            "image": None
+        },
+        "decision4_ABAB": {
+            "title": "Curse Resistance",
+            "description": "You resist the curse, but it weakens you. The path leads to Medusa’s lair, where her gaze feels omnipresent. You must act quickly.",
+            "options": [
+                {"text": "Rush to confront", "next": "decision5_ABABA"},
+                {"text": "Hide and plan", "next": "decision5_ABABB"}
+            ],
+            "image": None
+        },
+        "decision4_ABBA": {
+            "title": "Facing Taunts",
+            "description": "You shout back at Medusa, drawing her attention. Her snakes swarm, but you find a reflective shard on the ground, a last hope against her gaze.",
+            "options": [
+                {"text": "Use the shard", "next": "decision5_ABBAA"},
+                {"text": "Attack directly", "next": "decision5_ABBAB"}
+            ],
+            "image": None
+        },
+        "decision4_ABBB": {
+            "title": "Exit Blocked",
+            "description": "Searching for an exit, you realize Medusa controls the mine’s paths. Her lair is the only way out. You feel her curse tightening its grip.",
+            "options": [
+                {"text": "Enter her lair", "next": "decision5_ABBBA"},
+                {"text": "Break the curse", "next": "decision5_ABBBB"}
+            ],
+            "image": None
+        },
+        "decision5_AAAAA": {
+            "title": "Medusa’s Lair",
+            "description": "With shield and mirror, you enter Medusa’s lair. Her snakes hiss, and her gaze pierces the darkness. The mine’s curse pulses, but you’re ready to end it.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Set a trap", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AAAAB": {
+            "title": "Trapped Queen",
+            "description": "You set a trap using the shield, luring Medusa’s snakes away. Her lair is open, but she’s enraged, her gaze more deadly than ever.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Strike now", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AAABA": {
+            "title": "Bold Charge",
+            "description": "Charging in with your mirror, you meet Medusa’s gaze indirectly. Her snakes attack, but you’re in her lair now, ready for the final fight.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Dodge snakes", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AAABB": {
+            "title": "Waiting Game",
+            "description": "Waiting for an opening, you spot Medusa’s reflection in your mirror. Her lair is a maze of statues, but you’re ready to confront her.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Plan attack", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AABAA": {
+            "title": "Sword and Courage",
+            "description": "With the statue’s sword, you storm Medusa’s lair. Her snakes recoil, but her gaze is unrelenting. The mine shakes as you prepare to fight.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Strike first", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AABAB": {
+            "title": "Cautious Entry",
+            "description": "Moving cautiously with the sword, you enter Medusa’s lair. Her presence is overwhelming, but you’re determined to end the curse.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Find cover", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AABBA": {
+            "title": "Desperate Fight",
+            "description": "With only your pick, you face Medusa in her lair. Her snakes are everywhere, and her gaze is deadly. The mine’s curse is at its peak.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Fight through", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_AABBB": {
+            "title": "Last Hope",
+            "description": "Searching for another way, you’re cornered in Medusa’s lair. With no weapon but your pick, you must face her to escape the mine.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Make a stand", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABAAA": {
+            "title": "Sneaky Approach",
+            "description": "Sneaking past the snakes, you enter Medusa’s lair with the vision’s guidance. Her gaze is deadly, but you know her patterns.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Strike from shadows", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABAAB": {
+            "title": "Fighting Through",
+            "description": "Battling the snakes, you reach Medusa’s lair, bloodied but guided by the vision. She awaits, her curse strong but your resolve stronger.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Push forward", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABABA": {
+            "title": "Weakened Rush",
+            "description": "Weakened by the curse, you rush into Medusa’s lair. Her snakes swarm, but you’re driven by the need to escape the mine’s grip.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Fight desperately", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABABB": {
+            "title": "Hidden Plan",
+            "description": "Hiding from the curse, you plan your attack in Medusa’s lair. Her gaze is everywhere, but you’re ready to strike from the shadows.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Execute plan", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABBAA": {
+            "title": "Shard’s Power",
+            "description": "Using the reflective shard, you enter Medusa’s lair, deflecting her lesser snakes. She faces you directly, her gaze a final challenge.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Use shard", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABBAB": {
+            "title": "Direct Assault",
+            "description": "Ignoring the shard, you attack Medusa’s lair with raw determination. Her snakes overwhelm, but you reach her, ready for battle.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Charge in", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABBBA": {
+            "title": "No Escape",
+            "description": "The mine forces you into Medusa’s lair. Her curse is suffocating, but you face her with nothing but your will to survive.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Stand firm", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision5_ABBBB": {
+            "title": "Curse Breaker",
+            "description": "You attempt to break the curse, weakening Medusa slightly. Her lair is open, and you face her with renewed hope but no tools.",
+            "options": [
+                {"text": "Face Medusa", "next": "boss_medusa"},
+                {"text": "Confront her", "next": "boss_medusa"}
+            ],
+            "image": None
+        },
+        "decision1_B": {
+            "title": "The Glowing Mire",
+            "description": "The tunnel glows with bioluminescent mushrooms, their spores thick in the humid air. A foul stench suggests a swamp ahead, home to a monstrous creature. You find a vial of glowing spores.",
+            "options": [
+                {"text": "Use spores for light", "next": "decision2_BA"},
+                {"text": "Avoid spores", "next": "decision2_BB"}
+            ],
+            "image": None
+        },
+        "decision2_BA": {
+            "title": "Spore Illumination",
+            "description": "The spores light your way, revealing a path through a toxic swamp. You notice claw marks and hear a low growl. The Swamp Horror’s territory is near, and the spores make you cough.",
+            "options": [
+                {"text": "Follow claw marks", "next": "decision3_BAA"},
+                {"text": "Find cleaner air", "next": "decision3_BAB"}
+            ],
+            "image": None
+        },
+        "decision2_BB": {
+            "title": "Careful Steps",
+            "description": "Avoiding the spores, you move slowly through the dark. The swamp’s stench grows stronger, and you find a rusted machete, possibly useful against the Swamp Horror.",
+            "options": [
+                {"text": "Take the machete", "next": "decision3_BBA"},
+                {"text": "Leave it", "next": "decision3_BBB"}
+            ],
+            "image": None
+        },
+        "decision3_BAA": {
+            "title": "Horror’s Tracks",
+            "description": "The claw marks lead to a pool of toxic sludge. The spores’ light shows a massive shape moving beneath. The Swamp Horror knows you’re here, and the air is poisonous.",
+            "options": [
+                {"text": "Create a distraction", "next": "decision4_BAAA"},
+                {"text": "Prepare to fight", "next": "decision4_BAAB"}
+            ],
+            "image": None
+        },
+        "decision3_BAB": {
+            "title": "Cleaner Air",
+            "description": "Seeking cleaner air, you find a raised path above the swamp. The spores’ effects linger, but you spot the Swamp Horror’s tentacles in the distance.",
+            "options": [
+                {"text": "Use high ground", "next": "decision4_BABA"},
+                {"text": "Approach quietly", "next": "decision4_BABB"}
+            ],
+            "image": None
+        },
+        "decision3_BBA": {
+            "title": "Machete in Hand",
+            "description": "The machete feels sturdy. You reach a swampy clearing where the Swamp Horror’s tentacles thrash. The mushrooms glow brighter, warning of danger.",
+            "options": [
+                {"text": "Cut through vines", "next": "decision4_BBAA"},
+                {"text": "Stay hidden", "next": "decision4_BBAB"}
+            ],
+            "image": None
+        },
+        "decision3_BBB": {
+            "title": "Unarmed Advance",
+            "description": "Without the machete, you rely on your pick. The swamp grows denser, and the Swamp Horror’s growls shake the ground. You’re close to its lair.",
+            "options": [
+                {"text": "Find a weapon", "next": "decision4_BBBA"},
+                {"text": "Confront it now", "next": "decision4_BBBB"}
+            ],
+            "image": None
+        },
+        "decision4_BAAA": {
+            "title": "Distraction",
+            "description": "You throw glowing spores, luring the Swamp Horror’s tentacles away. Its lair is exposed, a toxic pool where it waits. You’re ready to face it.",
+            "options": [
+                {"text": "Enter the lair", "next": "decision5_BAAAA"},
+                {"text": "Attack from afar", "next": "decision5_BAAAB"}
+            ],
+            "image": None
+        },
+        "decision4_BAAB": {
+            "title": "Ready for Battle",
+            "description": "You brace for combat, spores still glowing. The Swamp Horror rises from the sludge, its tentacles reaching. The swamp vibrates with its power.",
+            "options": [
+                {"text": "Charge in", "next": "decision5_BAABA"},
+                {"text": "Wait for an opening", "next": "decision5_BAABB"}
+            ],
+            "image": None
+        },
+        "decision4_BABA": {
+            "title": "High Ground",
+            "description": "From the raised path, you see the Swamp Horror’s lair clearly. The spores weaken you, but the high ground gives an advantage.",
+            "options": [
+                {"text": "Attack from above", "next": "decision5_BABAA"},
+                {"text": "Descend to fight", "next": "decision5_BABAB"}
+            ],
+            "image": None
+        },
+        "decision4_BABB": {
+            "title": "Silent Approach",
+            "description": "Moving quietly, you reach the Swamp Horror’s lair unnoticed. The toxic air burns, but you’re close enough to strike first.",
+            "options": [
+                {"text": "Surprise attack", "next": "decision5_BABBA"},
+                {"text": "Observe first", "next": "decision5_BABBB"}
+            ],
+            "image": None
+        },
+        "decision4_BBAA": {
+            "title": "Cleared Path",
+            "description": "The machete cuts through vines, opening a path to the Swamp Horror’s lair. Its tentacles lash out, sensing your approach.",
+            "options": [
+                {"text": "Enter with machete", "next": "decision5_BBAAA"},
+                {"text": "Set a trap", "next": "decision5_BBAAB"}
+            ],
+            "image": None
+        },
+        "decision4_BBAB": {
+            "title": "Hidden in Swamp",
+            "description": "Hiding with the machete, you avoid the Swamp Horror’s notice. Its lair is a toxic mire, and you must act before the spores overwhelm you.",
+            "options": [
+                {"text": "Strike from hiding", "next": "decision5_BBABA"},
+                {"text": "Wait for a chance", "next": "decision5_BBABB"}
+            ],
+            "image": None
+        },
+        "decision4_BBBA": {
+            "title": "Desperate Search",
+            "description": "You find a sharpened bone in the swamp, better than your pick. The Swamp Horror’s lair is ahead, its growls shaking the mire.",
+            "options": [
+                {"text": "Use the bone", "next": "decision5_BBBAA"},
+                {"text": "Rush in", "next": "decision5_BBBAB"}
+            ],
+            "image": None
+        },
+        "decision4_BBBB": {
+            "title": "No Time Left",
+            "description": "With only your pick, you face the Swamp Horror’s lair. The swamp pulses with its presence, and you feel the spores taking hold.",
+            "options": [
+                {"text": "Confront it", "next": "decision5_BBBBA"},
+                {"text": "Find cover", "next": "decision5_BBBBB"}
+            ],
+            "image": None
+        },
+        "decision5_BAAAA": {
+            "title": "Horror’s Lair",
+            "description": "The distraction worked, and you enter the Swamp Horror’s lair. Its tentacles thrash in the toxic pool, ready to crush you.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Strike now", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BAAAB": {
+            "title": "Ranged Assault",
+            "description": "Throwing rocks from afar, you anger the Swamp Horror. It charges from its lair, toxic sludge dripping as it prepares to fight.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Engage", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BAABA": {
+            "title": "Bold Charge",
+            "description": "Charging with the spores’ light, you meet the Swamp Horror head-on. Its tentacles lash out, but you’re in its lair, ready to fight.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Attack head-on", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BAABB": {
+            "title": "Waiting Game",
+            "description": "Waiting for an opening, you spot the Swamp Horror’s weak spot. Its lair is a toxic trap, but you’re ready to strike.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Exploit weakness", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BABAA": {
+            "title": "High Ground Strike",
+            "description": "From above, you leap into the Swamp Horror’s lair, aiming for its core. The spores burn, but your position is strong.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Strike core", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BABAB": {
+            "title": "Descending Fight",
+            "description": "Descending into the Swamp Horror’s lair, you face its full wrath. The toxic air chokes, but you’re committed to the battle.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Fight through", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BABBA": {
+            "title": "Surprise Strike",
+            "description": "Your surprise attack catches the Swamp Horror off guard. Its lair is a toxic maze, but you’ve got the upper hand.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Press advantage", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BABBB": {
+            "title": "Observant Plan",
+            "description": "Observing the Swamp Horror, you learn its patterns. Entering its lair, you’re ready to exploit its weaknesses.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Execute plan", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBAAA": {
+            "title": "Machete Charge",
+            "description": "With machete in hand, you storm the Swamp Horror’s lair. Its tentacles thrash, but you’re ready to carve through.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Carve through", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBAAB": {
+            "title": "Trapped Horror",
+            "description": "You set a trap with vines, slowing the Swamp Horror. Its lair is open, and you enter with the machete, ready for battle.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Spring trap", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBABA": {
+            "title": "Hidden Strike",
+            "description": "Striking from hiding, you wound the Swamp Horror. Its lair is a toxic mire, but your machete gives you an edge.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Strike again", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBABB": {
+            "title": "Patient Strike",
+            "description": "Waiting for a chance, you spot the Swamp Horror’s weak spot. You enter its lair with the machete, ready to end it.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Target weak spot", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBBAA": {
+            "title": "Bone Weapon",
+            "description": "The sharpened bone feels light but deadly. You enter the Swamp Horror’s lair, ready to face its toxic wrath.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Strike with bone", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBBAB": {
+            "title": "Desperate Rush",
+            "description": "Rushing in with your pick, you face the Swamp Horror in its lair. The spores overwhelm, but you fight for survival.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Fight desperately", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBBBA": {
+            "title": "Direct Confrontation",
+            "description": "With only your pick, you confront the Swamp Horror in its lair. The swamp pulses with its power, but you stand firm.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Stand firm", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision5_BBBBB": {
+            "title": "Last Stand",
+            "description": "Hiding for cover, you’re forced into the Swamp Horror’s lair. With your pick, you face it, hoping to survive.",
+            "options": [
+                {"text": "Face the Horror", "next": "boss_swamp"},
+                {"text": "Make a stand", "next": "boss_swamp"}
+            ],
+            "image": None
+        },
+        "decision1_C": {
+            "title": "The Fiery Depths",
+            "description": "The tunnel reeks of sulfur, its walls scorched black. A distant roar shakes the mine, hinting at a dragon guardian. You find a charred shield, still warm.",
+            "options": [
+                {"text": "Take the shield", "next": "decision2_CA"},
+                {"text": "Leave it", "next": "decision2_CB"}
+            ],
+            "image": None
+        },
+        "decision2_CA": {
+            "title": "Shielded Path",
+            "description": "The shield protects you from sudden bursts of heat. The tunnel opens to a chasm with a lava river below, and the dragon’s roars grow louder.",
+            "options": [
+                {"text": "Cross the bridge", "next": "decision3_CAA"},
+                {"text": "Find another way", "next": "decision3_CAB"}
+            ],
+            "image": None
+        },
+        "decision2_CB": {
+            "title": "Unprotected Advance",
+            "description": "Without the shield, you feel the heat intensely. The tunnel leads to a crystal cavern, reflecting the dragon’s fiery glow in the distance.",
+            "options": [
+                {"text": "Examine crystals", "next": "decision3_CBA"},
+                {"text": "Move quickly", "next": "decision3_CBB"}
+            ],
+            "image": None
+        },
+        "decision3_CAA": {
+            "title": "Bridge of Fire",
+            "description": "The shield blocks heat as you cross the narrow bridge. Below, lava stirs, and the dragon’s eyes glow. You’re halfway to its lair.",
+            "options": [
+                {"text": "Run across", "next": "decision4_CAAA"},
+                {"text": "Move carefully", "next": "decision4_CAAB"}
+            ],
+            "image": None
+        },
+        "decision3_CAB": {
+            "title": "Alternate Route",
+            "description": "You find a ledge along the chasm, avoiding the bridge. The heat is bearable with the shield, but the dragon’s roars shake the mine.",
+            "options": [
+                {"text": "Follow the ledge", "next": "decision4_CABA"},
+                {"text": "Search for tools", "next": "decision4_CABB"}
+            ],
+            "image": None
+        },
+        "decision3_CBA": {
+            "title": "Crystal Visions",
+            "description": "The crystals show visions of the dragon’s fiery attacks. You learn its patterns but feel the heat rising. The path to its lair is clear.",
+            "options": [
+                {"text": "Use vision knowledge", "next": "decision4_CBAA"},
+                {"text": "Ignore visions", "next": "decision4_CBAB"}
+            ],
+            "image": None
+        },
+        "decision3_CBB": {
+            "title": "Swift Escape",
+            "description": "Moving quickly, you avoid the crystals but feel the dragon’s heat. You reach a scorched cavern, the entrance to its lair.",
+            "options": [
+                {"text": "Prepare for battle", "next": "decision4_CBBA"},
+                {"text": "Search for cover", "next": "decision4_CBBB"}
+            ],
+            "image": None
+        },
+        "decision4_CAAA": {
+            "title": "Across the Chasm",
+            "description": "Running across the bridge, you reach a fiery cavern. The dragon’s scales glint, and your shield is scorched but intact.",
+            "options": [
+                {"text": "Enter the lair", "next": "decision5_CAAAA"},
+                {"text": "Set a trap", "next": "decision5_CAAAB"}
+            ],
+            "image": None
+        },
+        "decision4_CAAB": {
+            "title": "Careful Crossing",
+            "description": "Moving carefully, you cross safely with the shield. The dragon’s lair is ahead, its heat overwhelming but your resolve firm.",
+            "options": [
+                {"text": "Face the dragon", "next": "decision5_CAABA"},
+                {"text": "Find an advantage", "next": "decision5_CAABB"}
+            ],
+            "image": None
+        },
+        "decision4_CABA": {
+            "title": "Ledge Path",
+            "description": "The ledge leads to the dragon’s lair. The shield protects you, but the path crumbles, forcing you to face the beast soon.",
+            "options": [
+                {"text": "Enter boldly", "next": "decision5_CABAA"},
+                {"text": "Prepare first", "next": "decision5_CABAB"}
+            ],
+            "image": None
+        },
+        "decision4_CABB": {
+            "title": "Tool Search",
+            "description": "You find a fire-resistant cloak among the rocks. With the shield, you’re well-equipped for the dragon’s lair ahead.",
+            "options": [
+                {"text": "Use cloak and enter", "next": "decision5_CABBA"},
+                {"text": "Enter without cloak", "next": "decision5_CABBB"}
+            ],
+            "image": None
+        },
+        "decision4_CBAA": {
+            "title": "Vision Strategy",
+            "description": "Using the crystal visions, you plan your attack. The dragon’s lair is a fiery trap, but you know its weaknesses.",
+            "options": [
+                {"text": "Exploit weaknesses", "next": "decision5_CBAAA"},
+                {"text": "Charge in", "next": "decision5_CBAAB"}
+            ],
+            "image": None
+        },
+        "decision4_CBAB": {
+            "title": "Ignoring Visions",
+            "description": "Ignoring the visions, you rely on instinct. The dragon’s lair is close, and the heat is unbearable without a shield.",
+            "options": [
+                {"text": "Face the dragon", "next": "decision5_CBABA"},
+                {"text": "Find protection", "next": "decision5_CBABB"}
+            ],
+            "image": None
+        },
+        "decision4_CBBA": {
+            "title": "Battle Ready",
+            "description": "You sharpen your pick and enter the scorched cavern. The dragon’s roars deafen, but you’re ready to fight.",
+            "options": [
+                {"text": "Attack directly", "next": "decision5_CBBAA"},
+                {"text": "Wait for an opening", "next": "decision5_CBBAB"}
+            ],
+            "image": None
+        },
+        "decision4_CBBB": {
+            "title": "Seeking Cover",
+            "description": "You find a boulder to hide behind, but the dragon’s flames light the cavern. You must face it soon, unprepared.",
+            "options": [
+                {"text": "Confront now", "next": "decision5_CBBBA"},
+                {"text": "Find a weapon", "next": "decision5_CBBBB"}
+            ],
+            "image": None
+        },
+        "decision5_CAAAA": {
+            "title": "Dragon’s Lair",
+            "description": "With the shield, you enter the dragon’s lair. Its flames roar, but you’re ready to face the guardian of the mine.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Prepare for battle", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CAAAB": {
+            "title": "Trapped Dragon",
+            "description": "You set a trap, weakening the dragon’s defenses. Its lair is open, and you enter with the shield, ready for battle.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Spring trap", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CAABA": {
+            "title": "Shielded Fight",
+            "description": "The shield holds as you face the dragon in its lair. Its flames are intense, but you’re prepared for the fight.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Fight with shield", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CAABB": {
+            "title": "Seeking Advantage",
+            "description": "You find a weak spot in the dragon’s lair. With the shield, you’re ready to exploit it in the coming battle.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Target weak spot", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CABAA": {
+            "title": "Bold Entry",
+            "description": "With the shield, you storm the dragon’s lair. Its roars shake the mine, but you’re ready to end its reign.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Charge in", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CABAB": {
+            "title": "Prepared Fight",
+            "description": "Preparing with the shield, you enter the dragon’s lair. The heat is overwhelming, but you’re ready to face it.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Plan attack", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CABBA": {
+            "title": "Cloaked Warrior",
+            "description": "With shield and cloak, you enter the dragon’s lair. The flames are less deadly, and you’re ready to fight.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Use cloak", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CABBB": {
+            "title": "Shield Alone",
+            "description": "Without the cloak, you rely on the shield in the dragon’s lair. The heat is intense, but you face the beast.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Fight with shield", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBAAA": {
+            "title": "Weakness Exploited",
+            "description": "Using the visions, you enter the dragon’s lair, targeting its weak spots. The flames roar, but you’re confident.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Strike weak spot", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBAAB": {
+            "title": "Instinctive Charge",
+            "description": "Charging in without visions, you face the dragon in its lair. The heat is unbearable, but your resolve holds.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Charge forward", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBABA": {
+            "title": "Unprotected Fight",
+            "description": "Without a shield, you face the dragon in its lair. The visions guide you, but the flames are relentless.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Fight through", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBABB": {
+            "title": "Desperate Protection",
+            "description": "You find a makeshift shield and enter the dragon’s lair. The visions help, but the battle will be tough.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Use shield", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision5_CBBAA": {
+            "title": "Pick and Courage",
+            "description": "With only your pick, you storm the dragon’s lair. The cavern shakes, but you’re ready to fight.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Wait for an opening", "next": "decision6_CBBAAA"}
+            ],
+            "image": None
+        },
+        "decision5_CBBAB": {
+            "title": "Waiting Game",
+            "description": "Waiting for an opening, you spot the dragon’s weak spot. You enter its lair, ready to strike with your pick.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Strike weak spot", "next": "decision6_CBBABA"}
+            ],
+            "image": None
+        },
+        "decision5_CBBBA": {
+            "title": "Last Stand",
+            "description": "With no protection, you face the dragon in its lair. The flames are deadly, but you fight for survival.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Find cover", "next": "decision6_CBBBAB"}
+            ],
+            "image": None
+        },
+        "decision5_CBBBB": {
+            "title": "Final Weapon",
+            "description": "You find a spear in the cavern and enter the dragon’s lair. It’s your last chance to defeat the beast.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Prepare with spear", "next": "decision6_CBBBBA"}
+            ],
+            "image": None
+        },
+        "decision6_CBBAAA": {
+            "title": "Strategic Pause",
+            "description": "You wait, watching the dragon’s movements. Its weak spot is clear, and you prepare to strike.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Strike now", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision6_CBBABA": {
+            "title": "Targeted Strike",
+            "description": "You aim for the dragon’s weak spot, pick in hand. The lair trembles as the beast roars.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Press attack", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision6_CBBBAB": {
+            "title": "Hidden Cover",
+            "description": "You find a boulder to hide behind, but the dragon’s flames grow closer. You must act soon.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Ambush from cover", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "decision6_CBBBBA": {
+            "title": "Spear Ready",
+            "description": "You grip the spear tightly, ready to face the dragon. Its lair is a fiery trap, but you’re prepared.",
+            "options": [
+                {"text": "Face the Dragon", "next": "boss_dragon"},
+                {"text": "Plan with spear", "next": "boss_dragon"}
+            ],
+            "image": None
+        },
+        "boss_medusa": {
+            "title": "The Serpent Queen",
+            "description": "Medusa stands before you, snakes writhing in her hair. Her gaze could turn you to stone, but your choices have led you here. Defeat her to break the mine’s curse.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_medusa"},
+                {"text": "Prepare for battle", "next": "combat_medusa"}
+            ],
+            "image": None
+        },
+        "boss_swamp": {
+            "title": "The Swamp Horror",
+            "description": "The Swamp Horror rises from its toxic pool, tentacles lashing. The spores choke the air, but your journey has prepared you. Defeat it to escape the mine.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_swamp"},
+                {"text": "Ready your weapon", "next": "combat_swamp"}
+            ],
+            "image": None
+        },
+        "boss_dragon": {
+            "title": "The Mine Dragon",
+            "description": "The dragon towers over you, flames curling from its jaws. The mine shakes with its power, but your path has led to this. Defeat it to win your freedom.",
+            "options": [
+                {"text": "Begin battle", "next": "combat_dragon"},
+                {"text": "Steel yourself", "next": "combat_dragon"}
+            ],
+            "image": None
+        },
+            "victory": {
             "title": "Freedom Earned",
             "description": "The guardian falls, and the mine’s curse lifts. You stumble into sunlight, scarred but alive. Your choices shaped your escape, a tale for the ages.",
             "options": [
@@ -11,18 +1381,16 @@
     try:
         with open('scenes.json', 'w') as f:
             json.dump(scenes, f, indent=4)
-        logging.debug("Created new scenes.json")
     except Exception as e:
-        logging.error(f"Error writing scenes.json: {e}")
+        print(f"Error: Failed to create scenes.json: {e}")
     return scenes
 
 def main():
-    logging.info("Starting main loop")
     clock = pygame.time.Clock()
     try:
         scenes = create_scenes_file()
     except Exception as e:
-        logging.error(f"Failed to create scenes file: {e}")
+        print(f"Error: Failed to create scenes file: {e}")
         pygame.quit()
         sys.exit(1)
 
@@ -42,7 +1410,6 @@ def main():
         mouse_pos = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                logging.info("Quit event received")
                 pygame.quit()
                 sys.exit()
 
@@ -53,7 +1420,6 @@ def main():
                             game_state = GameState()
                             game_state.initialize_card(scenes, disable_down_swipe=False)
                             game_state.game_mode = "story"
-                            logging.info("Started new game")
                         elif button.text == "Continue":
                             game_state = GameState()
                             if game_state.load_progress(scenes):
@@ -61,9 +1427,7 @@ def main():
                                 if game_state.current_scene.startswith("boss_"):
                                     combat_system = CombatSystem(game_state.boss_path, game_state.player)
                                     game_state.game_mode = "combat"
-                                logging.info("Continued game")
                         elif button.text == "Quit":
-                            logging.info("Quit button clicked")
                             pygame.quit()
                             sys.exit()
 
@@ -77,7 +1441,6 @@ def main():
                         game_state.add_choice(choice, scenes)
                         game_state.next_scene = next_scene
                         game_state.card = None
-                        logging.debug(f"Made choice {choice}, transitioning to {next_scene}")
 
             elif game_state.game_mode == "combat" and combat_system:
                 if combat_system.current_turn == "player" and combat_system.player.can_act:
@@ -90,7 +1453,6 @@ def main():
                             card_rect = pygame.Rect(card_x, card_y, card_width, card_height)
                             if card_rect.collidepoint(mouse_pos):
                                 combat_system.player_attack(i)
-                                logging.debug(f"Played card at index {i}")
                                 break
 
             elif game_state.game_mode in ["victory", "defeat"]:
@@ -100,9 +1462,7 @@ def main():
                             game_state = GameState()
                             game_state.game_mode = "menu"
                             combat_system = None
-                            logging.info("Returned to menu")
                         elif button.text == "Quit":
-                            logging.info("Quit button clicked in outcome screen")
                             pygame.quit()
                             sys.exit()
 
@@ -117,7 +1477,6 @@ def main():
                 if game_state.current_scene.startswith("boss_"):
                     combat_system = CombatSystem(game_state.boss_path, game_state.player)
                     game_state.game_mode = "combat"
-                    logging.info("Entered combat mode")
                 else:
                     game_state.initialize_card(scenes, disable_down_swipe=game_state.first_decision_made)
         elif game_state.game_mode == "combat" and combat_system:
@@ -125,11 +1484,9 @@ def main():
             if combat_system.player.health <= 0:
                 game_state.game_mode = "defeat"
                 combat_system = None
-                logging.info("Player defeated")
             elif combat_system.enemy.health <= 0:
                 game_state.game_mode = "victory"
                 combat_system = None
-                logging.info("Player victorious")
 
         # Draw
         screen.fill(BLACK)
@@ -186,7 +1543,7 @@ def main():
         try:
             pygame.display.flip()
         except Exception as e:
-            logging.error(f"Failed to update display: {e}")
+            print(f"Error: Failed to update display: {e}")
             pygame.quit()
             sys.exit(1)
 
